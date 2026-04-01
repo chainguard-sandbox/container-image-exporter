@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "container-image-exporter.fullname" . }}-test-connection"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['curl']
+      args: ['{{ include "container-image-exporter.fullname" . }}:{{ range .Values.service.ports }}{{ if eq .name "health" }}{{ .port }}{{ end }}{{ end }}']
+  restartPolicy: Never
