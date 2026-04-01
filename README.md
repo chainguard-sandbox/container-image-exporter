@@ -54,7 +54,27 @@ export IMAGE_REF=your.registry/container-image-exporter:latest
 docker build -t "${IMAGE_REF}" --push .
 ```
 
-Then, the default static configuration can be installed as follows.
+### Helm
+
+Install using the Helm chart, passing your image repository and tag:
+
+```
+helm install container-image-exporter ./deploy/chart \
+    --namespace container-image-exporter \
+    --create-namespace \
+    --set image.repository=your.registry/container-image-exporter \
+    --set image.tag=latest
+```
+
+If you are using the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator), enable the `ServiceMonitor` with:
+
+```
+--set serviceMonitor.enabled=true
+```
+
+### Static manifests
+
+The default static configuration can be installed as follows.
 
 ```
 curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/container-image-exporter.yaml \
