@@ -1,5 +1,9 @@
 # container-image-exporter
 
+> [!WARNING]
+> This project is in the early stages of development and may not be suitable
+> for production usage. Maintenance is provided on a best-effort basis.
+
 Exports Prometheus metrics about container images in a Kubernetes cluster.
 
 ```mermaid
