@@ -9,8 +9,7 @@ metadata:
     "helm.sh/hook": test
 spec:
   containers:
-    - name: wget
-      image: busybox
-      command: ['curl']
+    - name: curl
+      image: cgr.dev/chainguard/curl
       args: ['{{ include "container-image-exporter.fullname" . }}:{{ range .Values.service.ports }}{{ if eq .name "health" }}{{ .port }}{{ end }}{{ end }}']
   restartPolicy: Never
