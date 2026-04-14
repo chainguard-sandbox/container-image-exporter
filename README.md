@@ -6,6 +6,21 @@
 
 Exports Prometheus metrics about container images in a Kubernetes cluster.
 
+Particularly useful for tracking usage and adoption of Chainguard images across
+a cluster based on image or container metadata.
+
+## Components
+
+The project consists of two components, each of which can be deployed
+independently or together.
+
+### Exporter
+
+A cluster-wide Deployment that watches Kubernetes resources and fetches image
+metadata from remote registries.
+
+Doesn't require host-level access to containers.
+
 ```mermaid
 graph TB
     subgraph "Kubernetes Cluster"
@@ -49,37 +64,80 @@ graph TB
     style REGISTRY fill:#ffe1e1
 ```
 
+### Node Exporter
+
+A DaemonSet that runs on each node and exports OS release information for each
+container.
+
+The most reliable method for inferring whether a running container is
+Chainguard-based, but it does need to be ran as root on the host.
+
+```mermaid
+graph TB
+    subgraph "Kubernetes Node"
+        subgraph "Node Exporter (DaemonSet pod)"
+            NE[Prometheus Exporter<br/>:8080/metrics]
+        end
+
+        CRI[CRI socket]
+        PROC[Host /proc<br/>mounted at /host/proc]
+    end
+
+    PROM[Prometheus]
+
+    NE -->|"List containers"| CRI
+    NE -->|"Read /etc/os-release"| PROC
+    PROM -->|Scrape each node| NE
+
+    style NE fill:#e1ffe1
+    style CRI fill:#ffe1e1
+    style PROC fill:#ffe1e1
+```
+
 ## Installation
 
-Presently, you will need to build the image yourself.
+Build and push the image:
 
 ```
 export IMAGE_REF=your.registry/container-image-exporter:latest
 docker build -t "${IMAGE_REF}" --push .
 ```
 
-Then, the default static configuration can be installed as follows.
+### Exporter
+
+Install the cluster-wide exporter:
 
 ```
-curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/container-image-exporter.yaml \
+curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/exporter.yaml \
     | sed "s|IMAGE_REF|$IMAGE_REF|g" \
     | kubectl apply -f -
 ```
 
-The service is annotated with these values, which are commonly used to discover
-scrape targets in Kubernetes.
+### Node Exporter
+
+Install the per-node DaemonSet: 
 
 ```
+curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/node-exporter.yaml \
+    | sed "s|IMAGE_REF|$IMAGE_REF|g" \
+    | kubectl apply -f -
+```
+
+### Prometheus Discovery
+
+Both components annotate their Services for common Prometheus auto-discovery:
+
+```yaml
 prometheus.io/scrape: "true"
 prometheus.io/port: "8080"
 prometheus.io/path: "/metrics"
 ```
 
 If you are using the [Prometheus
-Operator](https://github.com/prometheus-operator/prometheus-operator) you can
-scrape the metrics with a `ServiceMonitor` like this.
+Operator](https://github.com/prometheus-operator/prometheus-operator), scrape
+the exporter with a `ServiceMonitor`:
 
-```
+```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -96,7 +154,28 @@ spec:
       app.kubernetes.io/name: container-image-exporter
 ```
 
+And the node exporter with a separate `ServiceMonitor`:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: container-image-node-exporter
+spec:
+  endpoints:
+  - path: /metrics
+    port: metrics
+  namespaceSelector:
+    matchNames:
+    - container-image-exporter
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: container-image-node-exporter
+```
+
 ## Metrics
+
+### Exporter
 
 | Metric                          | Description                                                                                            | Labels                                                         |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
@@ -105,6 +184,14 @@ spec:
 | container_image_label           | Labels from the image config.                                                                          | digest, key, value                                             |
 | container_image_size_bytes      | The size of the image in the registry.                                                                 | digest                                                         |
 | container_image_created         | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
+| container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
+
+### Node Exporter
+
+| Metric                               | Description                                                                                       | Labels                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| container_image_container_os_info    | OS release information sourced from inside each running container.              | container_id, namespace, pod, container, image, digest, build_id, id, id_like, image_id, image_version, name, pretty_name, variant, variant_id, version, version_codename, version_id |
+| container_image_node_exporter_up     | 1 if the last collection completed successfully, 0 otherwise.                                     | —                                                                                        |
 
 ## Supported Resources
 
@@ -126,11 +213,10 @@ references from each.
 
 The following CRD types are watched automatically if they are installed in the
 cluster. No configuration is required — the exporter queries the API server's
-discovery endpoint at startup to detect which of these are available. 
+discovery endpoint at startup to detect which of these are available.
 
 However, you will need to give the exporter permissions to list the resources
 (see below).
-
 
 | Group                | Resource              | Container paths                                                                                    |
 | -------------------- | --------------------- | -------------------------------------------------------------------------------------------------- |
@@ -150,7 +236,7 @@ If any of the CRDs above are installed in your cluster and you want the
 exporter to watch them, you must extend the `ClusterRole` with additional
 rules.
 
-For example, to add Tekton and Argo Workflows support.
+For example, to add Tekton and Argo Workflows support:
 
 ```yaml
 - apiGroups: ["tekton.dev"]
@@ -178,46 +264,73 @@ the exporter's metrics.
 
 ## Configuration
 
-### Credentials
+The binary exposes two subcommands, each with its own flags:
 
-The exporter will attempt to fetch registry credentials from any pull secrets
+```
+container-image-exporter exporter    [flags]
+container-image-exporter node-exporter [flags]
+```
+
+### Exporter
+
+#### Credentials
+
+The exporter attempts to fetch registry credentials from any pull secrets
 configured for the target resources, in the same way that the kubelet would
 when running a pod. If you don't want to grant the exporter permissions to
 read secrets across the cluster, you can disable this behaviour with
-`--k8s-keychain=false` and remove the references to secrets and service accounts
-from the cluster role.
+`--k8s-keychain=false` and remove the references to secrets and service
+accounts from the ClusterRole.
 
-Additionally, it will use any available cloud-specific credentials that are
-configured for the `container-image-exporter` pod when interacting with
-Google Container Registry, Google Artifact Registry, AWS ECR or Azure
-Container Registry.
+Additionally, it will use any available cloud-specific credentials configured
+for the exporter pod when interacting with Google Container Registry, Google
+Artifact Registry, AWS ECR, or Azure Container Registry.
 
 You can also modify the contents of the
 `container-image-exporter-docker-config` secret to add static credentials for
 other registries.
 
-### Cache Duration
+#### Cache Duration
 
-To reduce the number of requests made to upstream registries, the exporter will
-cache the response for each image for a configurable amount of time. The default
-is 1 hour.
+To reduce the number of requests made to upstream registries, the exporter
+caches the response for each image for a configurable amount of time. The
+default is 1 hour.
 
-You can modify this duration with the `--cache-duration=6h` flag.
+```
+--cache-duration=6h
+```
 
-### Multi-Architecture Images
+#### Multi-Architecture Images
 
-The exporter doesn't know the architecture of the node that a given container
-spec will ultimately be deployed to. So, when it encounters a multi-architecture
-image, it will resolve it to the `linux/amd64` image, or if that platform is
-absent, the first image in the list.
-
+When the exporter encounters a multi-architecture image it resolves it to
+`linux/amd64`, or if that platform is absent, the first image in the index.
 In general, images in the same index share the same or very similar metadata,
-so the metrics that are returned are typically still useful and representative,
-even if they aren't taken from the image that will ultimately be deployed to a
-node.
+so the metrics returned are typically still representative even if they aren't
+from the exact platform deployed to a node.
 
-You can configure the exporter to default to a different platform with the
-`--platform=linux/arm64` flag.
+Configure a different default platform with:
+
+```
+--platform=linux/arm64
+```
+
+### Node Exporter
+
+#### CRI socket
+
+```
+--cri-socket=/run/containerd/containerd.sock
+```
+
+#### proc root
+
+The node exporter reads each container's `/etc/os-release` via
+`/host/proc/{pid}/root`. If your cluster mounts the host `/proc` at a different
+path, override it with:
+
+```
+--proc-root=/host/proc
+```
 
 ## Development
 
@@ -241,6 +354,18 @@ without running tests:
 
 ```
 make envtest
+```
+
+### Node integration tests
+
+The node exporter has an additional integration test suite (build tag
+`nodeintegration`) that runs against a real CRI socket. The `make test-node`
+target is self-contained: it installs [k3d](https://k3d.io) into `./bin/`,
+creates a temporary cluster, deploys a workload, compiles and runs the test
+binary inside the cluster node, then tears everything down.
+
+```
+make test-node
 ```
 
 ## Example Queries
@@ -304,3 +429,16 @@ For instance, this query returns series for images that were created more than
 
 It's worth noting that not all build tools will set the `created` timestamp when
 they build an image.
+
+### OS Distribution Breakdown Across Running Containers
+
+Using the node exporter's `container_image_container_os_info` metric, you can
+see which OS distributions are actually running across the cluster:
+
+```
+count by (id) (container_image_container_os_info)
+```
+
+This groups running containers by their `ID` from `/etc/os-release` (e.g.
+`alpine`, `debian`, `wolfi`, `chainguard`), giving a real-time view of OS
+distribution across nodes.

@@ -100,9 +100,11 @@ spec:
     spec:
       serviceAccountName: container-image-exporter
       containers:
-      - name: controller
+      - name: exporter
         image: IMAGE_REF
         imagePullPolicy: IfNotPresent
+        args:
+        - exporter
         ports:
         - containerPort: 8080
           name: metrics
