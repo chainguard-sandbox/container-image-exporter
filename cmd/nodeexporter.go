@@ -1,0 +1,64 @@
+package cmd
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/chainguard-sandbox/container-image-exporter/internal/nodeexporter"
+)
+
+var (
+	neMetricsAddr string
+	neCRISocket   string
+	neProcRoot    string
+)
+
+var nodeExporterCmd = &cobra.Command{
+	Use:   "node-exporter",
+	Short: "Export container image metrics from the local CRI socket.",
+	Long: `node-exporter is a DaemonSet component that runs on each Kubernetes node and
+exports Prometheus metrics about container images without making remote registry requests.
+
+It sources data from:
+  - The local CRI socket to enumerate running containers and resolve their PIDs
+  - The host /proc filesystem to read /etc/os-release from each container's rootfs
+
+Metrics exported:
+  container_image_container_os_info  - OS release info per running container
+  container_image_node_exporter_up   - 1 if collection succeeded, 0 otherwise`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Connect to the CRI socket. grpc.NewClient is non-blocking; the
+		// actual connection is established on the first RPC call.
+		conn, err := grpc.NewClient(
+			"unix://"+neCRISocket,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return fmt.Errorf("dialing CRI socket %s: %w", neCRISocket, err)
+		}
+		defer conn.Close()
+
+		reg := prometheus.NewRegistry()
+		collector := nodeexporter.NewExporter(conn, neProcRoot)
+		reg.MustRegister(collector)
+
+		http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		return http.ListenAndServe(neMetricsAddr, nil)
+	},
+}
+
+func init() {
+	nodeExporterCmd.Flags().StringVar(&neMetricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to.")
+	nodeExporterCmd.Flags().StringVar(&neCRISocket, "cri-socket", "/run/containerd/containerd.sock", "Path to the CRI socket.")
+	nodeExporterCmd.Flags().StringVar(&neProcRoot, "proc-root", "/host/proc", "Path where the host's /proc is mounted.")
+}
