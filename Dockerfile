@@ -11,19 +11,19 @@ RUN go mod download
 
 # Copy source code
 COPY internal internal
+COPY cmd cmd
 COPY main.go .
 
 # Build the binary
-RUN CGO_ENABLED=0 go build -o app .
+RUN CGO_ENABLED=0 go build -o container-image-exporter .
 
 # Final stage
 FROM cgr.dev/chainguard/static:latest
 
-# Copy the binary from builder stage
-COPY --from=builder /app/app /app
+COPY --from=builder /app/container-image-exporter /container-image-exporter
 
-# Expose the default ports
+# Expose the default metrics and health probe ports used by the controller
+# subcommand. The node-exporter subcommand uses only 8080.
 EXPOSE 8080 8081
 
-# Run the binary
-ENTRYPOINT ["/app"]
+ENTRYPOINT ["/container-image-exporter"]

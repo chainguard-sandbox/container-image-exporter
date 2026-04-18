@@ -1,4 +1,4 @@
-package controller_test
+package exporter_test
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/chainguard-sandbox/container-image-exporter/internal/controller"
+	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
 )
 
 var (
@@ -30,7 +30,7 @@ var (
 
 func TestMain(m *testing.M) {
 	testScheme = runtime.NewScheme()
-	utilruntime.Must(controller.AddToScheme(testScheme))
+	utilruntime.Must(exporter.AddToScheme(testScheme))
 
 	// Start an in-process container registry. go-containerregistry treats
 	// 127.0.0.1 as an insecure registry automatically, so plain HTTP works
@@ -61,10 +61,10 @@ func TestMain(m *testing.M) {
 		panic("creating manager: " + err.Error())
 	}
 
-	if err := controller.SetupControllers(
+	if err := exporter.SetupControllers(
 		mgr,
-		controller.WithCacheDuration(5*time.Minute),
-		controller.WithK8sKeychain(false),
+		exporter.WithCacheDuration(5*time.Minute),
+		exporter.WithK8sKeychain(false),
 	); err != nil {
 		panic("setting up controllers: " + err.Error())
 	}

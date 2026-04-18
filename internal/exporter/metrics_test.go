@@ -1,4 +1,4 @@
-package controller_test
+package exporter_test
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/chainguard-sandbox/container-image-exporter/internal/controller"
+	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
 )
 
 // --- helpers ---
@@ -227,7 +227,7 @@ func containerEntry(name, image string) map[string]interface{} {
 // setupAllowlistManager starts a manager with the given options and a dedicated
 // Prometheus registry. It returns a gather function that returns all
 // container_image_* metrics from it.
-func setupAllowlistManager(t *testing.T, opts ...controller.Option) (gather func() map[string]*dto.MetricFamily) {
+func setupAllowlistManager(t *testing.T, opts ...exporter.Option) (gather func() map[string]*dto.MetricFamily) {
 	t.Helper()
 
 	reg := prometheus.NewRegistry()
@@ -245,13 +245,13 @@ func setupAllowlistManager(t *testing.T, opts ...controller.Option) (gather func
 		t.Fatalf("creating manager: %v", err)
 	}
 
-	allOpts := append([]controller.Option{
-		controller.WithCacheDuration(5 * time.Minute),
-		controller.WithK8sKeychain(false),
-		controller.WithMetricsRegistry(reg),
+	allOpts := append([]exporter.Option{
+		exporter.WithCacheDuration(5 * time.Minute),
+		exporter.WithK8sKeychain(false),
+		exporter.WithMetricsRegistry(reg),
 	}, opts...)
 
-	if err := controller.SetupControllers(mgr, allOpts...); err != nil {
+	if err := exporter.SetupControllers(mgr, allOpts...); err != nil {
 		t.Fatalf("setting up controllers: %v", err)
 	}
 
@@ -909,7 +909,7 @@ func TestAnnotationAllowlist(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		controller.WithAnnotationAllowlist([]string{"org.example.allowed"}),
+		exporter.WithAnnotationAllowlist([]string{"org.example.allowed"}),
 	)
 
 	deploy := &appsv1.Deployment{
@@ -964,7 +964,7 @@ func TestLabelAllowlist(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		controller.WithLabelAllowlist([]string{"org.example.allowed"}),
+		exporter.WithLabelAllowlist([]string{"org.example.allowed"}),
 	)
 
 	deploy := &appsv1.Deployment{
@@ -1020,7 +1020,7 @@ func TestAnnotationAllowlistMultipleKeys(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		controller.WithAnnotationAllowlist([]string{"org.example.first", "org.example.second"}),
+		exporter.WithAnnotationAllowlist([]string{"org.example.first", "org.example.second"}),
 	)
 
 	deploy := &appsv1.Deployment{
@@ -1070,7 +1070,7 @@ func TestLabelAllowlistMultipleKeys(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		controller.WithLabelAllowlist([]string{"org.example.first", "org.example.second"}),
+		exporter.WithLabelAllowlist([]string{"org.example.first", "org.example.second"}),
 	)
 
 	deploy := &appsv1.Deployment{

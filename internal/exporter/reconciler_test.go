@@ -1,4 +1,4 @@
-package controller_test
+package exporter_test
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/chainguard-sandbox/container-image-exporter/internal/controller"
+	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
 )
 
 // pushedIndex holds an OCI image index pushed to the test registry. The
@@ -115,7 +115,7 @@ func TestMultiArch_PlatformMatch(t *testing.T) {
 	idx := pushIndex(t, "test/multiarch-match")
 
 	p, _ := ggcr.ParsePlatform("linux/amd64")
-	gather := setupAllowlistManager(t, controller.WithPlatform(p))
+	gather := setupAllowlistManager(t, exporter.WithPlatform(p))
 
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "multiarch-match-deploy", Namespace: "default"},
@@ -168,7 +168,7 @@ func TestMultiArch_PlatformFallback(t *testing.T) {
 	idx := pushIndex(t, "test/multiarch-fallback")
 
 	p, _ := ggcr.ParsePlatform("linux/s390x") // not in the index
-	gather := setupAllowlistManager(t, controller.WithPlatform(p))
+	gather := setupAllowlistManager(t, exporter.WithPlatform(p))
 
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "multiarch-fallback-deploy", Namespace: "default"},
@@ -298,11 +298,11 @@ func TestNamespaceFiltering(t *testing.T) {
 	// Use a dedicated Prometheus registry so we don't pollute the global one.
 	reg := prometheus.NewRegistry()
 
-	if err := controller.SetupControllers(
+	if err := exporter.SetupControllers(
 		mgr,
-		controller.WithCacheDuration(5*time.Minute),
-		controller.WithK8sKeychain(false),
-		controller.WithMetricsRegistry(reg),
+		exporter.WithCacheDuration(5*time.Minute),
+		exporter.WithK8sKeychain(false),
+		exporter.WithMetricsRegistry(reg),
 	); err != nil {
 		t.Fatalf("setting up controllers: %v", err)
 	}
