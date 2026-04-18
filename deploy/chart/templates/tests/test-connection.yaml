@@ -1,3 +1,4 @@
+{{- if .Values.exporter.enabled }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -10,6 +11,7 @@ metadata:
 spec:
   containers:
     - name: curl
-      image: cgr.dev/chainguard/curl
-      args: ['{{ include "container-image-exporter.fullname" . }}:{{ range .Values.service.ports }}{{ if eq .name "health" }}{{ .port }}{{ end }}{{ end }}']
+      image: "{{ .Values.tests.curl.image.repository }}:{{ .Values.tests.curl.image.tag }}"
+      args: ['{{ include "container-image-exporter.fullname" . }}:{{ range .Values.exporter.service.ports }}{{ if eq .name "health" }}{{ .port }}{{ end }}{{ end }}']
   restartPolicy: Never
+{{- end }}

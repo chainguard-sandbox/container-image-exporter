@@ -1,110 +1,185 @@
-# Default values for container-image-exporter.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-# This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
-replicaCount: 1
-
-# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
-image:
-  repository: 
-  # This sets the pull policy for images.
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
-
-# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-imagePullSecrets: []
-# This is to override the chart name.
 nameOverride: ""
 fullnameOverride: ""
 
-# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-serviceAccount:
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: ""
+image:
+  repository: ""
+  pullPolicy: IfNotPresent
+  tag: ""
 
-# This is for setting Kubernetes Annotations to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-podAnnotations: {}
-# This is for setting Kubernetes Labels to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-podLabels: {}
+imagePullSecrets: []
 
-podSecurityContext: {}
-  # fsGroup: 2000
+exporter:
+  enabled: true
+  replicaCount: 1
 
+  serviceAccount:
+    create: true
+    automount: true
+    annotations: {}
+    name: ""
 
-securityContext:
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 65532
-  capabilities:
-    drop:
-    - ALL
+  rbac:
+    create: true
+    # Additional ClusterRole rules appended to the defaults.
+    # Use this to grant the exporter access to CRDs it can auto-discover.
+    # Examples for supported CRD groups:
+    #
+    # extraRules:
+    #   - apiGroups: ["tekton.dev"]
+    #     resources: ["tasks", "taskruns"]
+    #     verbs: ["get", "list", "watch"]
+    #   - apiGroups: ["serving.knative.dev"]
+    #     resources: ["services", "revisions"]
+    #     verbs: ["get", "list", "watch"]
+    #   - apiGroups: ["argoproj.io"]
+    #     resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
+    #     verbs: ["get", "list", "watch"]
+    extraRules: []
 
-serviceMonitor:
-  enabled: false
+  podAnnotations: {}
+  podLabels: {}
 
-# This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
-service:
-  # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-  type: ClusterIP
-  # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
-  ports:
-    - name: metrics
-      port: 8080
-      targetPort: 8080
-      protocol: TCP
-    - name: health
+  podSecurityContext: {}
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 65532
+    capabilities:
+      drop:
+      - ALL
+
+  serviceMonitor:
+    enabled: false
+
+  service:
+    type: ClusterIP
+    annotations: {}
+    ports:
+      - name: metrics
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+      - name: health
+        port: 8081
+        targetPort: 8081
+        protocol: TCP
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
       port: 8081
-      targetPort: 8081
-      protocol: TCP
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8081
+    initialDelaySeconds: 5
+    periodSeconds: 10
 
+  # To pull images from private registries, mount a docker config secret here.
+  # Create the secret first:
+  #   kubectl create secret docker-registry my-docker-config \
+  #     --docker-server=<registry> \
+  #     --docker-username=<user> \
+  #     --docker-password=<token>
+  # Then reference it below:
+  volumes: []
+  # - name: docker-config
+  #   secret:
+  #     secretName: my-docker-config
+  #     items:
+  #       - key: .dockerconfigjson
+  #         path: config.json
 
-resources:
-  limits:
-    cpu: 500m
-    memory: 128Mi
-  requests:
-    cpu: 10m
-    memory: 64Mi
+  volumeMounts: []
+  # - name: docker-config
+  #   mountPath: /home/nonroot/.docker
+  #   readOnly: true
 
-# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-livenessProbe:
-  httpGet:
-    path: /healthz
-    port: 8081
-  initialDelaySeconds: 15
-  periodSeconds: 20
-readinessProbe:
-  httpGet:
-    path: /readyz
-    port: 8081
-  initialDelaySeconds: 5
-  periodSeconds: 10
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
 
-# Additional volumes on the output Deployment definition.
-volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
-#     optional: false
+nodeExporter:
+  enabled: true
 
-# Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-# - name: foo
-#   mountPath: "/etc/foo"
-#   readOnly: true
+  serviceAccount:
+    create: true
+    automount: false
+    annotations: {}
+    name: ""
 
-nodeSelector: {}
+  podAnnotations: {}
+  podLabels: {}
 
-tolerations: []
+  podSecurityContext: {}
 
-affinity: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsUser: 0
+    runAsGroup: 0
+    capabilities:
+      drop:
+      - ALL
+      add:
+      - SYS_PTRACE
+
+  serviceMonitor:
+    enabled: false
+
+  service:
+    clusterIP: None
+    annotations: {}
+    ports:
+      - name: metrics
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+  criSocket: /run/containerd/containerd.sock
+  procRoot: /host/proc
+
+  tolerations:
+    - operator: Exists
+
+  nodeSelector: {}
+  affinity: {}
+
+tests:
+  curl:
+    image:
+      repository: cgr.dev/chainguard/curl
+      tag: latest

@@ -1,0 +1,19 @@
+{{- if and .Values.nodeExporter.enabled .Values.nodeExporter.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "container-image-exporter.nodeExporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.labels" . | nindent 4 }}
+spec:
+  endpoints:
+  - path: /metrics
+    port: metrics
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "container-image-exporter.nodeExporter.selectorLabels" . | nindent 6 }}
+{{- end }}

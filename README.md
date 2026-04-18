@@ -105,7 +105,7 @@ docker build -t "${IMAGE_REF}" --push .
 
 ### Helm
 
-Install using the Helm chart, passing your image repository and tag:
+Install using the Helm chart, providing your image repository and tag:
 
 ```
 helm install container-image-exporter ./deploy/chart \
@@ -115,10 +115,21 @@ helm install container-image-exporter ./deploy/chart \
     --set image.tag=latest
 ```
 
-If you are using the Prometheus Operator, enable the ServiceMonitor with:
+Both components are enabled by default. To deploy only one of them:
 
 ```
---set serviceMonitor.enabled=true
+# Disable the node-exporter Daemonset
+--set nodeExporter.enabled=false
+
+# Or, disable the exporter Deployment
+--set exporter.enabled=false
+```
+
+If you are using the Prometheus Operator, enable the ServiceMonitors:
+
+```
+--set exporter.serviceMonitor.enabled=true \
+--set nodeExporter.serviceMonitor.enabled=true
 ```
 
 ### Manifests
@@ -139,19 +150,9 @@ curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-export
     | kubectl apply -f -
 ```
 
-### Prometheus Discovery
-
-Both components annotate their Services for common Prometheus auto-discovery:
-
-```yaml
-prometheus.io/scrape: "true"
-prometheus.io/port: "8080"
-prometheus.io/path: "/metrics"
-```
-
 If you are using the [Prometheus
 Operator](https://github.com/prometheus-operator/prometheus-operator), scrape
-the exporter with a `ServiceMonitor`:
+the components with a `ServiceMonitor`:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -168,11 +169,7 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: container-image-exporter
-```
-
-And the node exporter with a separate `ServiceMonitor`:
-
-```yaml
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -187,6 +184,15 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: container-image-node-exporter
+```
+
+Otherwise, both components annotate their Services for common Prometheus
+auto-discovery:
+
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "8080"
+prometheus.io/path: "/metrics"
 ```
 
 ## Metrics

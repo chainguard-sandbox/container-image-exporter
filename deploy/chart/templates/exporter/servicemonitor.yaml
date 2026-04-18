@@ -1,4 +1,4 @@
-{{- if .Values.serviceMonitor.enabled }}
+{{- if and .Values.exporter.enabled .Values.exporter.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -15,5 +15,5 @@ spec:
     - {{ .Release.Namespace }}
   selector:
     matchLabels:
-      {{- include "container-image-exporter.selectorLabels" . | nindent 6 }}
+      {{- include "container-image-exporter.exporter.selectorLabels" . | nindent 6 }}
 {{- end }}

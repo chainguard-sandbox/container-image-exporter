@@ -13,8 +13,10 @@ If release name contains chart name it will be used as a full name.
 {{- define "container-image-exporter.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else if contains .Chart.Name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
 
@@ -38,7 +40,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Selector labels
+Base selector labels (shared by both components)
 */}}
 {{- define "container-image-exporter.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "container-image-exporter.name" . }}
@@ -46,12 +48,62 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Create the name of the service account to use
+Exporter selector labels
+*/}}
+{{- define "container-image-exporter.exporter.selectorLabels" -}}
+{{ include "container-image-exporter.selectorLabels" . }}
+app.kubernetes.io/component: exporter
+{{- end }}
+
+{{/*
+Exporter common labels (includes component label)
+*/}}
+{{- define "container-image-exporter.exporter.labels" -}}
+{{ include "container-image-exporter.labels" . }}
+app.kubernetes.io/component: exporter
+{{- end }}
+
+{{/*
+Create the name of the exporter service account to use
 */}}
 {{- define "container-image-exporter.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "container-image-exporter.fullname" .) .Values.serviceAccount.name }}
+{{- if .Values.exporter.serviceAccount.create }}
+{{- default (include "container-image-exporter.fullname" .) .Values.exporter.serviceAccount.name }}
 {{- else }}
-{{- default "default" .Values.serviceAccount.name }}
+{{- default "default" .Values.exporter.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
+Node exporter fully qualified name
+*/}}
+{{- define "container-image-exporter.nodeExporter.fullname" -}}
+{{- printf "%s-node-exporter" (include "container-image-exporter.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Node exporter selector labels
+*/}}
+{{- define "container-image-exporter.nodeExporter.selectorLabels" -}}
+{{ include "container-image-exporter.selectorLabels" . }}
+app.kubernetes.io/component: node-exporter
+{{- end }}
+
+{{/*
+Node exporter common labels (includes component label)
+*/}}
+{{- define "container-image-exporter.nodeExporter.labels" -}}
+{{ include "container-image-exporter.labels" . }}
+app.kubernetes.io/component: node-exporter
+{{- end }}
+
+{{/*
+Create the name of the node exporter service account to use
+*/}}
+{{- define "container-image-exporter.nodeExporter.serviceAccountName" -}}
+{{- if .Values.nodeExporter.serviceAccount.create }}
+{{- default (include "container-image-exporter.nodeExporter.fullname" .) .Values.nodeExporter.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.nodeExporter.serviceAccount.name }}
 {{- end }}
 {{- end }}

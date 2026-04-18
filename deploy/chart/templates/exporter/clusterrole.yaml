@@ -1,3 +1,4 @@
+{{- if and .Values.exporter.enabled .Values.exporter.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -17,3 +18,7 @@ rules:
 - apiGroups: ["batch"]
   resources: ["jobs", "cronjobs"]
   verbs: ["get", "list", "watch"]
+{{- with .Values.exporter.rbac.extraRules }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
+{{- end }}
