@@ -13,6 +13,12 @@ K3D               ?= $(LOCALBIN)/k3d
 NODE_TEST_CLUSTER ?= cie-node-test
 NODE_TEST_IMAGE   ?= cgr.dev/chainguard/nginx:latest
 
+HELM_TEST_CLUSTER    ?= cie-helm-test
+HELM_TEST_IMAGE_NAME ?= container-image-exporter
+HELM_TEST_IMAGE_TAG  ?= helm-test
+HELM_TEST_NAMESPACE  ?= container-image-exporter
+HELM_MONITORING_NS   ?= monitoring
+
 ifeq ($(shell uname -s),Darwin)
 SHA256SUM := shasum -a 256
 else
@@ -44,6 +50,16 @@ test-node: $(K3D)
 	docker exec \
 		-e CRI_SOCKET=/run/k3s/containerd/containerd.sock \
 		k3d-$(NODE_TEST_CLUSTER)-server-0 /node-integration.test -test.v
+
+.PHONY: test-helm
+test-helm: $(K3D)
+	K3D=$(K3D) \
+	HELM_TEST_CLUSTER=$(HELM_TEST_CLUSTER) \
+	HELM_TEST_IMAGE_NAME=$(HELM_TEST_IMAGE_NAME) \
+	HELM_TEST_IMAGE_TAG=$(HELM_TEST_IMAGE_TAG) \
+	HELM_TEST_NAMESPACE=$(HELM_TEST_NAMESPACE) \
+	HELM_MONITORING_NS=$(HELM_MONITORING_NS) \
+	./scripts/test-helm.sh
 
 .PHONY: envtest
 envtest: $(ENVTEST)
