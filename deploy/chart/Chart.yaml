@@ -1,6 +1,17 @@
 apiVersion: v2
 name: container-image-exporter
 description: Exports Prometheus metrics about container images in a Kubernetes cluster.
+home: https://github.com/chainguard-sandbox/container-image-exporter
+sources:
+  - https://github.com/chainguard-sandbox/container-image-exporter
+keywords:
+  - prometheus
+  - metrics
+  - container-images
+  - observability
+maintainers:
+  - name: Chainguard
+    url: https://chainguard.dev
 
 # A chart can be either an 'application' or a 'library' chart.
 #

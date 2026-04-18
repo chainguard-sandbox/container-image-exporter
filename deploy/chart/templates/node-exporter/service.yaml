@@ -6,22 +6,24 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "container-image-exporter.nodeExporter.labels" . | nindent 4 }}
+  {{- if or .Values.nodeExporter.service.scrapeAnnotations .Values.nodeExporter.service.annotations }}
   annotations:
+    {{- if .Values.nodeExporter.service.scrapeAnnotations }}
     prometheus.io/scrape: "true"
-    prometheus.io/port: {{ range .Values.nodeExporter.service.ports }}{{ if eq .name "metrics" }}{{ .port | quote }}{{ end }}{{ end }}
+    prometheus.io/port: {{ .Values.nodeExporter.metricsPort | quote }}
     prometheus.io/path: "/metrics"
+    {{- end }}
     {{- with .Values.nodeExporter.service.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- end }}
 spec:
   selector:
     {{- include "container-image-exporter.nodeExporter.selectorLabels" . | nindent 4 }}
   clusterIP: {{ .Values.nodeExporter.service.clusterIP }}
   ports:
-  {{- range .Values.nodeExporter.service.ports }}
-  - name: {{ .name }}
-    port: {{ .port }}
-    targetPort: {{ .targetPort }}
-    protocol: {{ .protocol }}
-  {{- end }}
+    - name: metrics
+      port: {{ .Values.nodeExporter.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
 {{- end }}

@@ -5,7 +5,10 @@ metadata:
   name: {{ include "container-image-exporter.nodeExporter.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "container-image-exporter.labels" . | nindent 4 }}
+    {{- include "container-image-exporter.nodeExporter.labels" . | nindent 4 }}
+    {{- with .Values.nodeExporter.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   endpoints:
   - path: /metrics

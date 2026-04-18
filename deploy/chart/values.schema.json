@@ -73,9 +73,12 @@
         "serviceMonitor": {
           "type": "object",
           "properties": {
-            "enabled": { "type": "boolean" }
+            "enabled": { "type": "boolean" },
+            "additionalLabels": { "type": "object" }
           }
         },
+        "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "service": {
           "type": "object",
           "properties": {
@@ -84,7 +87,7 @@
               "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
             },
             "annotations": { "type": "object" },
-            "ports": { "type": "array" }
+            "scrapeAnnotations": { "type": "boolean" }
           }
         },
         "resources": { "type": "object" },
@@ -119,15 +122,17 @@
         "serviceMonitor": {
           "type": "object",
           "properties": {
-            "enabled": { "type": "boolean" }
+            "enabled": { "type": "boolean" },
+            "additionalLabels": { "type": "object" }
           }
         },
+        "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "service": {
           "type": "object",
           "properties": {
             "clusterIP": { "type": "string" },
             "annotations": { "type": "object" },
-            "ports": { "type": "array" }
+            "scrapeAnnotations": { "type": "boolean" }
           }
         },
         "resources": { "type": "object" },

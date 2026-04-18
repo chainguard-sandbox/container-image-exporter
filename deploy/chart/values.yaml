@@ -55,25 +55,32 @@ exporter:
     readOnlyRootFilesystem: true
     runAsNonRoot: true
     runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
     capabilities:
       drop:
       - ALL
 
   serviceMonitor:
     enabled: false
+    # Extra labels applied to the ServiceMonitor metadata. kube-prometheus-stack
+    # requires a `release: <name>` label by default (matching the Prometheus
+    # release) for the ServiceMonitor to be picked up.
+    #
+    # additionalLabels:
+    #   release: prometheus
+    additionalLabels: {}
+
+  metricsPort: 8080
+  healthPort: 8081
 
   service:
     type: ClusterIP
     annotations: {}
-    ports:
-      - name: metrics
-        port: 8080
-        targetPort: 8080
-        protocol: TCP
-      - name: health
-        port: 8081
-        targetPort: 8081
-        protocol: TCP
+    # Emit prometheus.io/{scrape,port,path} annotations on the Service. Set to
+    # false when scraping exclusively via ServiceMonitor to avoid duplicate
+    # scraping from Prometheus instances that honour both mechanisms.
+    scrapeAnnotations: true
 
   resources:
     limits:
@@ -86,13 +93,13 @@ exporter:
   livenessProbe:
     httpGet:
       path: /healthz
-      port: 8081
+      port: health
     initialDelaySeconds: 15
     periodSeconds: 20
   readinessProbe:
     httpGet:
       path: /readyz
-      port: 8081
+      port: health
     initialDelaySeconds: 5
     periodSeconds: 10
 
@@ -134,11 +141,18 @@ nodeExporter:
 
   podSecurityContext: {}
 
+  # Runs as root with SYS_PTRACE so it can read /proc/<pid>/root/etc/os-release
+  # of container processes owned by arbitrary UIDs. Accessing a /proc entry of a
+  # process owned by a different user requires ptrace_may_access() to succeed,
+  # which needs CAP_SYS_PTRACE in the target's user namespace — root alone is
+  # not sufficient.
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsUser: 0
     runAsGroup: 0
+    seccompProfile:
+      type: RuntimeDefault
     capabilities:
       drop:
       - ALL
@@ -147,15 +161,16 @@ nodeExporter:
 
   serviceMonitor:
     enabled: false
+    # See exporter.serviceMonitor.additionalLabels above.
+    additionalLabels: {}
+
+  metricsPort: 8080
 
   service:
     clusterIP: None
     annotations: {}
-    ports:
-      - name: metrics
-        port: 8080
-        targetPort: 8080
-        protocol: TCP
+    # See exporter.service.scrapeAnnotations above.
+    scrapeAnnotations: true
 
   resources:
     limits:
@@ -168,13 +183,13 @@ nodeExporter:
   livenessProbe:
     httpGet:
       path: /healthz
-      port: 8080
+      port: metrics
     initialDelaySeconds: 15
     periodSeconds: 20
   readinessProbe:
     httpGet:
       path: /healthz
-      port: 8080
+      port: metrics
     initialDelaySeconds: 5
     periodSeconds: 10
 

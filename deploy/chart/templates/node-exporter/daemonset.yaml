@@ -22,6 +22,10 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "container-image-exporter.nodeExporter.serviceAccountName" . }}
       {{- with .Values.nodeExporter.podSecurityContext }}
       securityContext:
@@ -37,15 +41,13 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - node-exporter
-            - --metrics-bind-address=:{{ range .Values.nodeExporter.service.ports }}{{ if eq .name "metrics" }}{{ .port }}{{ end }}{{ end }}
+            - --metrics-bind-address=:{{ .Values.nodeExporter.metricsPort }}
             - --cri-socket={{ .Values.nodeExporter.criSocket }}
             - --proc-root={{ .Values.nodeExporter.procRoot }}
           ports:
-            {{- range .Values.nodeExporter.service.ports }}
-            - name: {{ .name }}
-              containerPort: {{ .targetPort }}
-              protocol: {{ .protocol }}
-            {{- end }}
+            - name: metrics
+              containerPort: {{ .Values.nodeExporter.metricsPort }}
+              protocol: TCP
           {{- with .Values.nodeExporter.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
