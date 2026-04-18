@@ -62,7 +62,8 @@ helm install container-image-exporter ./deploy/chart \
     --set image.pullPolicy=Never \
     --set exporter.serviceMonitor.enabled=true \
     --set nodeExporter.serviceMonitor.enabled=true \
-    --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock
+    --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock \
+    --set grafana.dashboards.enabled=true
 
 echo "==> Waiting for exporter Deployment to be ready"
 kubectl rollout status deployment \
@@ -75,6 +76,12 @@ kubectl rollout status daemonset \
 # ---------------------------------------------------------------------------
 # Verify metrics
 # ---------------------------------------------------------------------------
+
+echo "==> Checking Grafana dashboard ConfigMaps"
+COUNT=$(kubectl get configmap -n "${HELM_TEST_NAMESPACE}" \
+    -l grafana_dashboard=1 -o name | wc -l | tr -d ' ')
+[ "${COUNT}" -eq 2 ] || { echo "FAIL: expected 2 dashboard ConfigMaps, got ${COUNT}"; exit 1; }
+echo "  ${COUNT} dashboard ConfigMaps found OK"
 
 echo "==> Waiting for Prometheus pod to be ready"
 kubectl wait -n "${HELM_MONITORING_NS}" pod \

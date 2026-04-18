@@ -132,6 +132,12 @@ If you are using the Prometheus Operator, enable the ServiceMonitors:
 --set nodeExporter.serviceMonitor.enabled=true
 ```
 
+If you are using Grafana (via kube-prometheus-stack), enable automatic dashboard provisioning:
+
+```
+--set grafana.dashboards.enabled=true
+```
+
 ### Manifests
 
 Install the cluster-wide exporter:
@@ -279,8 +285,8 @@ normally for all other resource types.
 
 ## Dashboards
 
-See [dashboards](./dashboards) for examples of Grafana dashboards that consume
-the exporter's metrics.
+See [dashboards](./deploy/chart/dashboards) for examples of Grafana dashboards
+that consume the exporter's metrics.
 
 ![dashboard](images/dashboard.png)
 

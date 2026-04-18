@@ -132,6 +132,18 @@
         "affinity": { "type": "object" }
       }
     },
+    "grafana": {
+      "type": "object",
+      "properties": {
+        "dashboards": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "labels": { "type": "object" }
+          }
+        }
+      }
+    },
     "tests": {
       "type": "object",
       "properties": {
