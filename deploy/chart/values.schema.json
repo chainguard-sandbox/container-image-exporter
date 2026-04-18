@@ -58,6 +58,14 @@
             "create": { "type": "boolean" }
           }
         },
+        "k8sKeychain": { "type": "boolean" },
+        "platform": { "type": "string" },
+        "cacheDuration": { "type": "string" },
+        "registryConcurrency": { "type": "integer", "minimum": 0 },
+        "registryRps": { "type": "number", "minimum": 0 },
+        "namespaces": { "type": "array", "items": { "type": "string" } },
+        "annotationAllowlist": { "type": "array", "items": { "type": "string" } },
+        "labelAllowlist": { "type": "array", "items": { "type": "string" } },
         "podAnnotations": { "type": "object" },
         "podLabels": { "type": "object" },
         "podSecurityContext": { "type": "object" },

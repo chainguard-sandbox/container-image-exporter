@@ -36,6 +36,15 @@ exporter:
     #     verbs: ["get", "list", "watch"]
     extraRules: []
 
+  k8sKeychain: true
+  platform: linux/amd64
+  cacheDuration: 1h
+  registryConcurrency: 10
+  registryRps: 5
+  namespaces: []
+  annotationAllowlist: []
+  labelAllowlist: []
+
   podAnnotations: {}
   podLabels: {}
 

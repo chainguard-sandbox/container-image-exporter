@@ -9,9 +9,11 @@ rules:
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["get", "list", "watch"]
+{{- if .Values.exporter.k8sKeychain }}
 - apiGroups: [""]
   resources: ["secrets", "serviceaccounts"]
   verbs: ["get", "list"]
+{{- end }}
 - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "daemonsets"]
   verbs: ["get", "list", "watch"]

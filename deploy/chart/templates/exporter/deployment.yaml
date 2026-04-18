@@ -42,6 +42,20 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - exporter
+            - --k8s-keychain={{ .Values.exporter.k8sKeychain }}
+            - --platform={{ .Values.exporter.platform }}
+            - --cache-duration={{ .Values.exporter.cacheDuration }}
+            - --registry-concurrency={{ .Values.exporter.registryConcurrency }}
+            - --registry-rps={{ .Values.exporter.registryRps }}
+            {{- range .Values.exporter.namespaces }}
+            - --namespaces={{ . }}
+            {{- end }}
+            {{- range .Values.exporter.annotationAllowlist }}
+            - --annotation-allowlist={{ . }}
+            {{- end }}
+            {{- range .Values.exporter.labelAllowlist }}
+            - --label-allowlist={{ . }}
+            {{- end }}
           ports:
             {{- range .Values.exporter.service.ports }}
             - name: {{ .name }}
