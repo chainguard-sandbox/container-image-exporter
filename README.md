@@ -103,7 +103,25 @@ export IMAGE_REF=your.registry/container-image-exporter:latest
 docker build -t "${IMAGE_REF}" --push .
 ```
 
-### Exporter
+### Helm
+
+Install using the Helm chart, passing your image repository and tag:
+
+```
+helm install container-image-exporter ./deploy/chart \
+    --namespace container-image-exporter \
+    --create-namespace \
+    --set image.repository=your.registry/container-image-exporter \
+    --set image.tag=latest
+```
+
+If you are using the Prometheus Operator, enable the ServiceMonitor with:
+
+```
+--set serviceMonitor.enabled=true
+```
+
+### Manifests
 
 Install the cluster-wide exporter:
 
@@ -113,9 +131,7 @@ curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-export
     | kubectl apply -f -
 ```
 
-### Node Exporter
-
-Install the per-node DaemonSet: 
+And/or the per-node DaemonSet:
 
 ```
 curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/node-exporter.yaml \
