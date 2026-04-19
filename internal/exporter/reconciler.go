@@ -20,7 +20,6 @@ import (
 	"github.com/chrismellard/docker-credential-acr-env/pkg/credhelper"
 	"github.com/google/go-containerregistry/pkg/authn"
 	k8schain "github.com/google/go-containerregistry/pkg/authn/kubernetes"
-	kauth "github.com/google/go-containerregistry/pkg/authn/kubernetes"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/google"
@@ -237,7 +236,7 @@ func (r *ContainerImageReconciler) newKeychain(ctx context.Context, obj *unstruc
 			ServiceAccountName: serviceAccountName(obj, r.ServiceAccountNamePaths),
 			ImagePullSecrets:   imagePullSecrets(obj, r.ImagePullSecretPaths),
 		}
-		k8s, err := kauth.New(ctx, r.KubeClient, kauth.Options(opts))
+		k8s, err := k8schain.New(ctx, r.KubeClient, k8schain.Options(opts))
 		if err != nil {
 			return nil, fmt.Errorf("constructing k8s keychain: %w", err)
 		}
