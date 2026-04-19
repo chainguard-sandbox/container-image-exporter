@@ -21,3 +21,6 @@
 .idea/
 *.tmproj
 .vscode/
+# helm-unittest test suites — consumed by `make test-helm-unit`, not by installations.
+# Anchor with a leading slash so `templates/tests/` (the Helm-test Pod) isn't ignored.
+/tests/

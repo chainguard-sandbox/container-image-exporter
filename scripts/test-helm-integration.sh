@@ -73,6 +73,9 @@ echo "==> Waiting for node-exporter DaemonSet to be ready"
 kubectl rollout status daemonset \
     -n "${HELM_TEST_NAMESPACE}" --timeout=2m
 
+echo "==> Running helm test (in-cluster health check)"
+helm test container-image-exporter -n "${HELM_TEST_NAMESPACE}"
+
 # ---------------------------------------------------------------------------
 # Verify metrics
 # ---------------------------------------------------------------------------
@@ -94,25 +97,30 @@ kubectl port-forward -n "${HELM_MONITORING_NS}" svc/prometheus-operated 9090:909
 PF_PID=$!
 until curl -sf http://localhost:9090/-/ready >/dev/null 2>&1; do sleep 2; done
 
-wait_for_metric() {
-    local metric="$1"
-    echo "==> Checking ${metric}"
+wait_for_query() {
+    local desc="$1"
+    local expr="$2"
+    echo "==> Checking: ${desc}"
     for i in $(seq 1 30); do
-        if curl -sf "http://localhost:9090/api/v1/query?query=${metric}" \
+        if curl -sf --get "http://localhost:9090/api/v1/query" \
+                --data-urlencode "query=${expr}" \
                 | grep -q '"result":\[{'; then
-            echo "  ${metric} OK"
+            echo "  OK"
             return 0
         fi
-        echo "  attempt ${i}/30, retrying in 10s..."
-        sleep 10
+        echo "  attempt ${i}/30, retrying in 2s..."
+        sleep 2
     done
-    echo "FAIL: ${metric} not found in Prometheus"
+    echo "FAIL: ${desc}"
+    echo "  Query: ${expr}"
     return 1
 }
 
-wait_for_metric container_image_up
-wait_for_metric container_image_container_info
-wait_for_metric container_image_node_exporter_up
-wait_for_metric container_image_container_os_info
+wait_for_query "exporter up" 'container_image_up'
+wait_for_query "node-exporter up" 'container_image_node_exporter_up'
+wait_for_query "exporter observed its own pod image" \
+    "container_image_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\"}"
+wait_for_query "node-exporter resolved wolfi os-release from /proc/<pid>/root" \
+    "container_image_container_os_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\",id=\"wolfi\"}"
 
 echo "==> All metrics verified"

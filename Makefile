@@ -13,6 +13,12 @@ K3D               ?= $(LOCALBIN)/k3d
 NODE_TEST_CLUSTER ?= cie-node-test
 NODE_TEST_IMAGE   ?= cgr.dev/chainguard/nginx:latest
 
+UNITTEST_VERSION ?= 0.8.2
+# helm-unittest release artifacts use 'macos' for Darwin rather than 'darwin'.
+UNITTEST_OS      := $(shell uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/')
+UNITTEST_ARCH    := $(shell uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+UNITTEST         ?= $(LOCALBIN)/untt
+
 HELM_TEST_CLUSTER    ?= cie-helm-test
 HELM_TEST_IMAGE_NAME ?= container-image-exporter
 HELM_TEST_IMAGE_TAG  ?= helm-test
@@ -51,15 +57,24 @@ test-node: $(K3D)
 		-e CRI_SOCKET=/run/k3s/containerd/containerd.sock \
 		k3d-$(NODE_TEST_CLUSTER)-server-0 /node-integration.test -test.v
 
-.PHONY: test-helm
-test-helm: $(K3D)
+.PHONY: test-helm test-helm-lint test-helm-unit test-helm-integration
+
+test-helm: test-helm-lint test-helm-unit test-helm-integration
+
+test-helm-lint:
+	./scripts/test-helm-lint.sh
+
+test-helm-unit: $(UNITTEST)
+	UNITTEST=$(UNITTEST) ./scripts/test-helm-unit.sh
+
+test-helm-integration: $(K3D)
 	K3D=$(K3D) \
 	HELM_TEST_CLUSTER=$(HELM_TEST_CLUSTER) \
 	HELM_TEST_IMAGE_NAME=$(HELM_TEST_IMAGE_NAME) \
 	HELM_TEST_IMAGE_TAG=$(HELM_TEST_IMAGE_TAG) \
 	HELM_TEST_NAMESPACE=$(HELM_TEST_NAMESPACE) \
 	HELM_MONITORING_NS=$(HELM_MONITORING_NS) \
-	./scripts/test-helm.sh
+	./scripts/test-helm-integration.sh
 
 .PHONY: envtest
 envtest: $(ENVTEST)
@@ -84,3 +99,23 @@ $(K3D): $(LOCALBIN)
 		  rm -f $(K3D).tmp; exit 1; }
 	mv $(K3D).tmp $(K3D)
 	chmod +x $(K3D)
+
+# SHA-256 checksums for helm-unittest $(UNITTEST_VERSION) tarballs. Sourced from
+# the official helm-unittest-checksum.sha asset on each release.
+UNITTEST_SHA256_linux_amd64 := 56ab3091e6fa52a7c92ee951def9bed957f295d9ce98483aed404e748d7b3a94
+UNITTEST_SHA256_linux_arm64 := 10a7cad7aab812f26f1478d53c16cc58935870475f449d03aab5e81ee7be3ab4
+UNITTEST_SHA256_macos_amd64 := 31e177db0f86b7cd383bb27c0ff219498f8cfb11da5057875183f148ef19f229
+UNITTEST_SHA256_macos_arm64 := aa1520a7b156755f62e5692cd565fb4c396c540a0b40f631af826949eadceceb
+UNITTEST_SHA256             := $(UNITTEST_SHA256_$(UNITTEST_OS)_$(UNITTEST_ARCH))
+
+$(UNITTEST): $(LOCALBIN)
+	curl -sSfL \
+		"https://github.com/helm-unittest/helm-unittest/releases/download/v$(UNITTEST_VERSION)/helm-unittest-$(UNITTEST_OS)-$(UNITTEST_ARCH)-$(UNITTEST_VERSION).tgz" \
+		-o $(UNITTEST).tgz
+	ACTUAL=$$($(SHA256SUM) $(UNITTEST).tgz | awk '{print $$1}'); \
+	test "$(UNITTEST_SHA256)" = "$$ACTUAL" || \
+		{ echo "helm-unittest checksum mismatch: expected $(UNITTEST_SHA256) got $$ACTUAL" >&2; \
+		  rm -f $(UNITTEST).tgz; exit 1; }
+	tar -xzf $(UNITTEST).tgz -C $(LOCALBIN) untt
+	rm -f $(UNITTEST).tgz
+	chmod +x $(UNITTEST)
