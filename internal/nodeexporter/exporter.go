@@ -129,7 +129,7 @@ func readOSRelease(procRoot string, pid int) (map[string]string, error) {
 			return nil, fmt.Errorf("opening %s: %w", path, err)
 		}
 		defer f.Close()
-		return ParseOSRelease(f), nil
+		return ParseOSRelease(f)
 	}
 	// Neither file exists — expected for scratch/distroless images.
 	return nil, fmt.Errorf("no os-release found under %s (tried etc/os-release, usr/lib/os-release)", root)
