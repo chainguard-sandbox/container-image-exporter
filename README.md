@@ -302,13 +302,14 @@ default is 1 hour.
 
 #### Multi-Architecture Images
 
-When the exporter encounters a multi-architecture image it resolves it to
-`linux/amd64`, or if that platform is absent, the first image in the index.
-In general, images in the same index share the same or very similar metadata,
-so the metrics returned are typically still representative even if they aren't
-from the exact platform deployed to a node.
+When the exporter encounters a multi-architecture image it resolves it to the
+platform the exporter pod is running on (e.g. `linux/amd64`), or if that
+platform is absent, the first image in the index. In general, images in the
+same index share the same or very similar metadata, so the metrics returned are
+typically still representative even if they aren't from the exact platform
+deployed to a node.
 
-Configure a different default platform with:
+Override the default platform with:
 
 ```
 --platform=linux/arm64

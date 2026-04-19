@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	goruntime "runtime"
 	"sync/atomic"
 	"time"
 
@@ -71,12 +72,12 @@ var exporterCmd = &cobra.Command{
 			return fmt.Errorf("creating a new manager: %w", err)
 		}
 
-		var p *v1.Platform
-		if platform != "" {
-			p, err = v1.ParsePlatform(platform)
-			if err != nil {
-				return fmt.Errorf("parsing platform: %w", err)
-			}
+		if platform == "" {
+			platform = goruntime.GOOS + "/" + goruntime.GOARCH
+		}
+		p, err := v1.ParsePlatform(platform)
+		if err != nil {
+			return fmt.Errorf("parsing platform: %w", err)
 		}
 
 		if err = exporter.SetupControllers(
@@ -122,7 +123,7 @@ var exporterCmd = &cobra.Command{
 func init() {
 	exporterCmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	exporterCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	exporterCmd.Flags().StringVar(&platform, "platform", "linux/amd64", "The default platform to resolve multi-arch images to.")
+	exporterCmd.Flags().StringVar(&platform, "platform", "", "The default platform to resolve multi-arch images to. Defaults to the platform the exporter is running on.")
 	exporterCmd.Flags().DurationVar(&cacheDuration, "cache-duration", 1*time.Hour, "How long to cache image details for before querying the registry again.")
 	exporterCmd.Flags().BoolVar(&k8sKeychain, "k8s-keychain", true, "Whether to fetch credentials from pulls secrets in the cluster.")
 	exporterCmd.Flags().IntVar(&registryConcurrency, "registry-concurrency", 10, "Maximum number of concurrent requests per registry. Set to 0 to disable.")
