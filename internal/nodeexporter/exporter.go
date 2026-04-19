@@ -72,13 +72,15 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, container := range containers {
-		if container.PID == nil {
-			slog.Warn("skipping container: PID not available from CRI", "container_id", container.ID)
+		// nil means the CRI runtime didn't report a PID. 0 is the kernel
+		// swapper — it has no /proc/0/root. Skip both.
+		if container.PID == nil || *container.PID == 0 {
+			slog.Debug("skipping container: PID not available", "container_id", container.ID)
 			continue
 		}
 
 		// Read OS release info from the container's filesystem via procfs.
-		osr, err := readOSRelease(c.procRoot, container.PID.PID)
+		osr, err := readOSRelease(c.procRoot, *container.PID)
 		switch {
 		case errors.Is(err, errNoOSRelease):
 			// Distroless/scratch — emit the metric with empty os-release labels so

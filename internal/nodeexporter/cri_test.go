@@ -48,8 +48,8 @@ func TestListRunningContainers_PID(t *testing.T) {
 		byID[c.ID] = c
 	}
 
-	if got := byID["ctr-with-pid"].PID; got == nil || got.PID != 42 {
-		t.Errorf("ctr-with-pid: PID = %v, want &PIDInfo{PID: 42}", got)
+	if got := byID["ctr-with-pid"].PID; got == nil || *got != 42 {
+		t.Errorf("ctr-with-pid: PID = %v, want pointer to 42", got)
 	}
 	if got := byID["ctr-no-pid"].PID; got != nil {
 		t.Errorf("ctr-no-pid: PID = %v, want nil", got)
@@ -178,6 +178,67 @@ func TestListRunningContainers_NilImageField(t *testing.T) {
 	}
 	if c.Image != "" {
 		t.Errorf("ResolvedImage: got %q, want empty string when Image field is nil", c.Image)
+	}
+}
+
+// TestListRunningContainers_PIDAbsentInJSON verifies that when the CRI info JSON
+// does not contain a "pid" key, ContainerInfo.PID is nil.
+func TestListRunningContainers_PIDAbsentInJSON(t *testing.T) {
+	srv := &fakeRuntimeServer{
+		containers: []*runtimeapi.Container{
+			{
+				Id: "ctr-no-pid-key",
+				Labels: map[string]string{
+					labelPodName: "pod-a", labelPodNamespace: "ns-a", labelContainerName: "app",
+				},
+			},
+		},
+	}
+	// Override ContainerStatus to return info JSON with no pid key.
+	srv.infoOverride = map[string]string{"ctr-no-pid-key": `{"other":"data"}`}
+
+	conn := startFakeRuntime(t, srv)
+	containers, err := NewCRIClient(conn).ListRunningContainers(context.Background())
+	if err != nil {
+		t.Fatalf("ListRunningContainers: %v", err)
+	}
+	if len(containers) != 1 {
+		t.Fatalf("expected 1 container, got %d", len(containers))
+	}
+	if containers[0].PID != nil {
+		t.Errorf("PID = %v, want nil when pid key absent from JSON", containers[0].PID)
+	}
+}
+
+// TestListRunningContainers_PIDZeroInJSON verifies that when the CRI info JSON
+// explicitly contains "pid":0, ContainerInfo.PID is a pointer to 0 (not nil).
+func TestListRunningContainers_PIDZeroInJSON(t *testing.T) {
+	srv := &fakeRuntimeServer{
+		containers: []*runtimeapi.Container{
+			{
+				Id: "ctr-pid-zero",
+				Labels: map[string]string{
+					labelPodName: "pod-b", labelPodNamespace: "ns-b", labelContainerName: "app",
+				},
+			},
+		},
+	}
+	srv.infoOverride = map[string]string{"ctr-pid-zero": `{"pid":0}`}
+
+	conn := startFakeRuntime(t, srv)
+	containers, err := NewCRIClient(conn).ListRunningContainers(context.Background())
+	if err != nil {
+		t.Fatalf("ListRunningContainers: %v", err)
+	}
+	if len(containers) != 1 {
+		t.Fatalf("expected 1 container, got %d", len(containers))
+	}
+	pid := containers[0].PID
+	if pid == nil {
+		t.Fatal("PID = nil, want pointer to 0 when pid key is explicitly 0 in JSON")
+	}
+	if *pid != 0 {
+		t.Errorf("*PID = %d, want 0", *pid)
 	}
 }
 

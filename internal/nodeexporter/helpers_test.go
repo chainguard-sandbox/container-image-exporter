@@ -21,9 +21,10 @@ import (
 // verbose ContainerStatus info JSON, mirroring what containerd/CRI-O return.
 type fakeRuntimeServer struct {
 	runtimeapi.UnimplementedRuntimeServiceServer
-	containers  []*runtimeapi.Container
-	pids        map[string]int
-	lastRequest *runtimeapi.ListContainersRequest
+	containers   []*runtimeapi.Container
+	pids         map[string]int
+	infoOverride map[string]string // raw info JSON keyed by container ID; takes precedence over pids
+	lastRequest  *runtimeapi.ListContainersRequest
 }
 
 func (f *fakeRuntimeServer) ListContainers(_ context.Context, req *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
@@ -32,7 +33,15 @@ func (f *fakeRuntimeServer) ListContainers(_ context.Context, req *runtimeapi.Li
 }
 
 func (f *fakeRuntimeServer) ContainerStatus(_ context.Context, req *runtimeapi.ContainerStatusRequest) (*runtimeapi.ContainerStatusResponse, error) {
-	if !req.Verbose || f.pids == nil {
+	if !req.Verbose {
+		return &runtimeapi.ContainerStatusResponse{}, nil
+	}
+	if raw, ok := f.infoOverride[req.ContainerId]; ok {
+		return &runtimeapi.ContainerStatusResponse{
+			Info: map[string]string{"info": raw},
+		}, nil
+	}
+	if f.pids == nil {
 		return &runtimeapi.ContainerStatusResponse{}, nil
 	}
 	pid, ok := f.pids[req.ContainerId]
