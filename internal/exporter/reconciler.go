@@ -116,18 +116,17 @@ func (r *ContainerImageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}, nil
 }
 
-// addJitter subtracts random jitter from a duration, reducing it by up to 1/6
-// of the original duration. This spreads out reconciliation times to avoid
-// thundering herd problems while ensuring the requeue fires before the cache
-// entry expires (the freshness check uses exactly d, not d minus jitter).
+// addJitter adds random jitter to a duration, extending it by up to 1/6 of
+// the original. This spreads out registry fetches across reconcilers to avoid
+// thundering herd while ensuring the requeue fires AFTER the cache entry has
+// expired, so the reconcile actually triggers a refresh.
 func addJitter(d time.Duration) time.Duration {
 	if d <= 0 {
 		return d
 	}
-	// Subtract jitter between 0 and d/6, so the result is in [5d/6, d].
 	maxJitter := d / 6
 	jitter := time.Duration(rand.Int64N(int64(maxJitter)))
-	return d - jitter
+	return d + jitter
 }
 
 func (r *ContainerImageReconciler) getImage(ctx context.Context, imgRef string, opts ...remote.Option) (*ContainerImage, error) {
