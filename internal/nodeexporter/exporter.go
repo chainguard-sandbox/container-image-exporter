@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -73,8 +72,6 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, container := range containers {
-		digest := normalizeDigest(container.Image)
-
 		if container.PID == nil {
 			slog.Warn("skipping container: PID not available from CRI", "container_id", container.ID)
 			continue
@@ -99,7 +96,7 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 			container.PodName,
 			container.ContainerName,
 			container.UserSpecifiedImage,
-			digest,
+			container.ImageRef,
 			osr["BUILD_ID"],
 			osr["ID"],
 			osr["ID_LIKE"],
@@ -116,13 +113,6 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	ch <- prometheus.MustNewConstMetric(metricUp, prometheus.GaugeValue, 1)
-}
-
-func normalizeDigest(imageRef string) string {
-	if i := strings.LastIndex(imageRef, "@"); i >= 0 {
-		return imageRef[i+1:]
-	}
-	return imageRef
 }
 
 func readOSRelease(procRoot string, pid int) (map[string]string, error) {

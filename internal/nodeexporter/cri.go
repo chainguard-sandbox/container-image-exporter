@@ -42,6 +42,10 @@ type ContainerInfo struct {
 	// Image is the imageID or imageDigest
 	Image string
 
+	// ImageRef is the CRI Container.image_ref field — the digested reference
+	// to the image in use (e.g. "sha256:abc123").
+	ImageRef string
+
 	PodName       string
 	PodNamespace  string
 	ContainerName string
@@ -99,6 +103,7 @@ func (c *CRIClient) ListRunningContainers(ctx context.Context) ([]*ContainerInfo
 			PID:                pidInfo,
 			UserSpecifiedImage: userSpecifiedImage,
 			Image:              image,
+			ImageRef:           ctr.ImageRef,
 			PodName:            podName,
 			PodNamespace:       podNamespace,
 			ContainerName:      containerName,

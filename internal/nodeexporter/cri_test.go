@@ -181,6 +181,41 @@ func TestListRunningContainers_NilImageField(t *testing.T) {
 	}
 }
 
+// TestListRunningContainers_ImageRefDigest verifies that the CRI ImageRef field
+// is propagated to ContainerInfo.Digest unchanged.
+func TestListRunningContainers_ImageRefDigest(t *testing.T) {
+	const imageRef = "registry.example.com/app@sha256:cafebabe"
+	srv := &fakeRuntimeServer{
+		containers: []*runtimeapi.Container{
+			{
+				Id:       "ctr-ref",
+				ImageRef: imageRef,
+				Image: &runtimeapi.ImageSpec{
+					Image:              "registry.example.com/app@sha256:cafebabe",
+					UserSpecifiedImage: "registry.example.com/app:latest",
+				},
+				Labels: map[string]string{
+					labelPodName:       "pod-r",
+					labelPodNamespace:  "ns-r",
+					labelContainerName: "app",
+				},
+			},
+		},
+	}
+
+	conn := startFakeRuntime(t, srv)
+	containers, err := NewCRIClient(conn).ListRunningContainers(context.Background())
+	if err != nil {
+		t.Fatalf("ListRunningContainers: %v", err)
+	}
+	if len(containers) != 1 {
+		t.Fatalf("expected 1 container, got %d", len(containers))
+	}
+	if got := containers[0].ImageRef; got != imageRef {
+		t.Errorf("ImageRef = %q, want %q", got, imageRef)
+	}
+}
+
 // TestListRunningContainers_RequestsRunningState verifies that the CRI request
 // filter is set to CONTAINER_RUNNING so only active containers are returned.
 func TestListRunningContainers_RequestsRunningState(t *testing.T) {

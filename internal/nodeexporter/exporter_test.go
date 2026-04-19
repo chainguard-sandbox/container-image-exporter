@@ -78,49 +78,6 @@ func TestReadOSRelease_SymlinkEscape(t *testing.T) {
 	// Also verify the secret content was not read.
 }
 
-// TestNormalizeDigest verifies the digest extraction logic for the various
-// image reference formats that a CRI runtime may return as the resolved image.
-func TestNormalizeDigest(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{
-			name:  "plain sha256 digest",
-			input: "sha256:abc123",
-			want:  "sha256:abc123",
-		},
-		{
-			name:  "reference with @ separator",
-			input: "registry.example.com/myimage@sha256:abc123",
-			want:  "sha256:abc123",
-		},
-		{
-			name:  "tagged reference without digest",
-			input: "registry.example.com/myimage:latest",
-			want:  "registry.example.com/myimage:latest",
-		},
-		{
-			name:  "empty string",
-			input: "",
-			want:  "",
-		},
-		{
-			name:  "multiple @ characters uses the last one",
-			input: "user@host.example.com/image@sha256:abc123",
-			want:  "sha256:abc123",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := normalizeDigest(tt.input); got != tt.want {
-				t.Errorf("normalizeDigest(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
 
 // TestExporter_Collect_HappyPath verifies that a running container with a
 // readable /etc/os-release produces a correctly-labelled os_info metric and
@@ -134,7 +91,8 @@ func TestExporter_Collect_HappyPath(t *testing.T) {
 	srv := &fakeRuntimeServer{
 		containers: []*runtimeapi.Container{
 			{
-				Id: containerID,
+				Id:       containerID,
+				ImageRef: "sha256:aaaa",
 				Image: &runtimeapi.ImageSpec{
 					Image:              "registry.example.com/app@sha256:aaaa",
 					UserSpecifiedImage: "registry.example.com/app:latest",
@@ -392,10 +350,9 @@ func TestExporter_Collect_MultipleContainers(t *testing.T) {
 	}
 }
 
-// TestExporter_Collect_DigestNormalization verifies that the digest label is
-// derived from Image.Image (the resolved image reference in the ImageSpec) and
-// contains only the sha256:... portion when that field includes a registry host.
-func TestExporter_Collect_DigestNormalization(t *testing.T) {
+// TestExporter_Collect_DigestFromImageRef verifies that the digest label is
+// sourced from the CRI Container.ImageRef field, not parsed out of Image.Image.
+func TestExporter_Collect_DigestFromImageRef(t *testing.T) {
 	procRoot := t.TempDir()
 	containerID := "ctr-digest"
 	const pid = 1200
@@ -404,7 +361,8 @@ func TestExporter_Collect_DigestNormalization(t *testing.T) {
 	srv := &fakeRuntimeServer{
 		containers: []*runtimeapi.Container{
 			{
-				Id: containerID,
+				Id:       containerID,
+				ImageRef: "registry.example.com/app@sha256:deadbeef",
 				Image: &runtimeapi.ImageSpec{
 					Image:              "registry.example.com/app@sha256:deadbeef",
 					UserSpecifiedImage: "registry.example.com/app:v2",
@@ -427,9 +385,9 @@ func TestExporter_Collect_DigestNormalization(t *testing.T) {
 	m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
 		"container_id": containerID,
 		"image":        "registry.example.com/app:v2",
-		"digest":       "sha256:deadbeef",
+		"digest":       "registry.example.com/app@sha256:deadbeef",
 	})
 	if m == nil {
-		t.Error("expected image=UserSpecifiedImage, digest derived from Image.Image")
+		t.Error("expected digest label to equal ImageRef verbatim")
 	}
 }
