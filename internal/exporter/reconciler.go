@@ -73,7 +73,7 @@ func (r *ContainerImageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		"namespace", req.Namespace,
 		"name", req.Name,
 	)
-	logger.Info("Reconciling")
+	logger.V(1).Info("Reconciling")
 
 	// Get the object
 	obj := &unstructured.Unstructured{}
@@ -100,14 +100,14 @@ func (r *ContainerImageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			continue
 		}
 		seen[container.Image] = struct{}{}
-		logger.Info("Fetching image metadata", "image", container.Image)
+		logger.V(1).Info("Fetching image metadata", "image", container.Image)
 		img, err := r.getImage(ctx, container.Image, remote.WithAuthFromKeychain(kc))
 		if err != nil {
 			logger.Error(err, "fetching image details", "image", container.Image)
 			errs = append(errs, fmt.Errorf("%s: %w", container.Image, err))
 			continue
 		}
-		logger.Info("Fetched image metadata", "image", container.Image, "digest", img.Digest)
+		logger.V(1).Info("Fetched image metadata", "image", container.Image, "digest", img.Digest)
 	}
 
 	// Tags are mutable so we should periodically check to see if the digest
@@ -116,7 +116,7 @@ func (r *ContainerImageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if len(errs) > 0 {
 		return ctrl.Result{}, errors.Join(errs...)
 	}
-	logger.Info("Reconciled", "requeue_after", d)
+	logger.V(1).Info("Reconciled", "requeue_after", d)
 	return ctrl.Result{RequeueAfter: d}, nil
 }
 
