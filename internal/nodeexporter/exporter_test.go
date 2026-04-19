@@ -231,17 +231,22 @@ func TestExporter_Collect_UsrLibFallback(t *testing.T) {
 	}
 }
 
-// TestExporter_Collect_SkipsContainerWithNoOSRelease verifies that a container
-// whose rootfs has no /etc/os-release (e.g. a scratch image) is silently
-// skipped and the up metric remains 1.
-func TestExporter_Collect_SkipsContainerWithNoOSRelease(t *testing.T) {
+// TestExporter_Collect_DistrolessEmitsEmptyLabels verifies that a container
+// whose rootfs exists but has no os-release file (distroless/scratch) still
+// produces a metric — with empty os-release labels — so it remains visible in
+// adoption queries.
+func TestExporter_Collect_DistrolessEmitsEmptyLabels(t *testing.T) {
 	procRoot := t.TempDir()
-	// Intentionally no rootfs directory created for "ctr-scratch".
+	const pid = 1001
+	// Create the container root directory but leave it empty (no os-release files).
+	if err := os.MkdirAll(filepath.Join(procRoot, strconv.Itoa(pid), "root"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
 
 	srv := &fakeRuntimeServer{
 		containers: []*runtimeapi.Container{
 			{
-				Id: "ctr-scratch",
+				Id: "ctr-distroless",
 				Image: &runtimeapi.ImageSpec{
 					Image:              "registry.example.com/scratch@sha256:bbbb",
 					UserSpecifiedImage: "registry.example.com/scratch:latest",
@@ -253,7 +258,7 @@ func TestExporter_Collect_SkipsContainerWithNoOSRelease(t *testing.T) {
 				},
 			},
 		},
-		pids: map[string]int{"ctr-scratch": 1001},
+		pids: map[string]int{"ctr-distroless": pid},
 	}
 
 	reg := prometheus.NewRegistry()
@@ -263,14 +268,63 @@ func TestExporter_Collect_SkipsContainerWithNoOSRelease(t *testing.T) {
 		t.Fatalf("Gather: %v", err)
 	}
 
-	// os_info must not be emitted for the scratch container.
-	if m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-		"container_id": "ctr-scratch",
-	}); m != nil {
-		t.Error("container_image_container_os_info unexpectedly emitted for scratch container")
+	// Metric must be emitted with empty os-release labels.
+	m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
+		"container_id": "ctr-distroless",
+		"id":           "",
+		"name":         "",
+	})
+	if m == nil {
+		t.Error("container_image_container_os_info not emitted for distroless container")
 	}
 
-	// Skipping a container is not a fatal error — up should still be 1.
+	up := findGatheredMetric(mfs, "container_image_node_exporter_up", nil)
+	if up == nil {
+		t.Fatal("container_image_node_exporter_up metric not found")
+	}
+	if up.GetGauge().GetValue() != 1 {
+		t.Errorf("node_exporter_up = %v, want 1", up.GetGauge().GetValue())
+	}
+}
+
+// TestExporter_Collect_SkipsContainerOnReadError verifies that when readOSRelease
+// returns a non-errNoOSRelease error (e.g. the container root is missing entirely),
+// the container is skipped but up remains 1.
+func TestExporter_Collect_SkipsContainerOnReadError(t *testing.T) {
+	procRoot := t.TempDir()
+	// Intentionally no rootfs directory created — os.OpenRoot will fail.
+
+	srv := &fakeRuntimeServer{
+		containers: []*runtimeapi.Container{
+			{
+				Id: "ctr-gone",
+				Image: &runtimeapi.ImageSpec{
+					Image:              "registry.example.com/app@sha256:cccc",
+					UserSpecifiedImage: "registry.example.com/app:latest",
+				},
+				Labels: map[string]string{
+					labelPodName:       "my-pod",
+					labelPodNamespace:  "default",
+					labelContainerName: "app",
+				},
+			},
+		},
+		pids: map[string]int{"ctr-gone": 9999},
+	}
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(NewExporter(startFakeRuntime(t, srv), procRoot))
+	mfs, err := reg.Gather()
+	if err != nil {
+		t.Fatalf("Gather: %v", err)
+	}
+
+	if m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
+		"container_id": "ctr-gone",
+	}); m != nil {
+		t.Error("container_image_container_os_info unexpectedly emitted for container with missing root")
+	}
+
 	up := findGatheredMetric(mfs, "container_image_node_exporter_up", nil)
 	if up == nil {
 		t.Fatal("container_image_node_exporter_up metric not found")

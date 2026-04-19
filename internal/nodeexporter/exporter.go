@@ -82,8 +82,13 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 		// Read OS release info from the container's filesystem via procfs.
 		osr, err := readOSRelease(c.procRoot, container.PID.PID)
-		if err != nil {
-			slog.Error("reading /etc/os-release file", "err", err)
+		switch {
+		case errors.Is(err, errNoOSRelease):
+			// Distroless/scratch — emit the metric with empty os-release labels so
+			// the container is still visible in adoption queries.
+			osr = nil
+		case err != nil:
+			slog.Error("reading /etc/os-release file", "err", err, "container_id", container.ID)
 			continue
 		}
 
