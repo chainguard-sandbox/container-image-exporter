@@ -25,6 +25,11 @@ HELM_TEST_IMAGE_TAG  ?= helm-test
 HELM_TEST_NAMESPACE  ?= container-image-exporter
 HELM_MONITORING_NS   ?= monitoring
 
+DEMO_CLUSTER    ?= cie-demo
+DEMO_IMAGE_NAME ?= container-image-exporter
+DEMO_IMAGE_TAG  ?= demo
+DEMO_NAMESPACE  ?= container-image-exporter
+
 ifeq ($(shell uname -s),Darwin)
 SHA256SUM := shasum -a 256
 else
@@ -75,6 +80,17 @@ test-helm-integration: $(K3D)
 	HELM_TEST_NAMESPACE=$(HELM_TEST_NAMESPACE) \
 	HELM_MONITORING_NS=$(HELM_MONITORING_NS) \
 	./scripts/test-helm-integration.sh
+
+.PHONY: demo
+demo: $(K3D)
+	K3D=$(K3D) \
+	ORG=$(ORG) \
+	DEMO_CLUSTER=$(DEMO_CLUSTER) \
+	DEMO_IMAGE_NAME=$(DEMO_IMAGE_NAME) \
+	DEMO_IMAGE_TAG=$(DEMO_IMAGE_TAG) \
+	DEMO_NAMESPACE=$(DEMO_NAMESPACE) \
+	HELM_MONITORING_NS=$(HELM_MONITORING_NS) \
+	./scripts/demo.sh
 
 .PHONY: envtest
 envtest: $(ENVTEST)
