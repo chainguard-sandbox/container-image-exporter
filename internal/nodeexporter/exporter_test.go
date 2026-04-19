@@ -1,6 +1,7 @@
 package nodeexporter
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -9,6 +10,73 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+// TestReadOSRelease_NotFound verifies that errNoOSRelease is returned when
+// neither etc/os-release nor usr/lib/os-release exists under the container root.
+func TestReadOSRelease_NotFound(t *testing.T) {
+	procRoot := t.TempDir()
+	const pid = 42
+	// Create the container root directory but leave it empty (no os-release files).
+	if err := os.MkdirAll(filepath.Join(procRoot, strconv.Itoa(pid), "root"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	_, err := readOSRelease(procRoot, pid)
+	if !errors.Is(err, errNoOSRelease) {
+		t.Errorf("readOSRelease() error = %v, want errNoOSRelease", err)
+	}
+}
+
+// TestReadOSRelease_RootMissing verifies that when the container root directory
+// itself doesn't exist (e.g. container has already exited), readOSRelease returns
+// a non-nil error that is NOT errNoOSRelease.
+func TestReadOSRelease_RootMissing(t *testing.T) {
+	procRoot := t.TempDir()
+	// Intentionally don't create any directory for pid 99.
+
+	_, err := readOSRelease(procRoot, 99)
+	if err == nil {
+		t.Fatal("readOSRelease() expected error for missing container root, got nil")
+	}
+	if errors.Is(err, errNoOSRelease) {
+		t.Error("readOSRelease() returned errNoOSRelease for missing root, want a distinct error")
+	}
+}
+
+// TestReadOSRelease_SymlinkEscape verifies that a symlink under the container
+// root that points outside it (e.g. etc/os-release -> ../../../secret) is not
+// followed. os.Root rejects such escapes, so readOSRelease should return an
+// error that is NOT errNoOSRelease (the file "exists" but cannot be opened).
+func TestReadOSRelease_SymlinkEscape(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Place a "secret" file outside the container root.
+	secretFile := filepath.Join(tmpDir, "secret")
+	if err := os.WriteFile(secretFile, []byte("ID=secret\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile secret: %v", err)
+	}
+
+	// Build a fake procfs tree: procRoot/42/root/etc/os-release -> ../../../secret
+	const pid = 42
+	procRoot := filepath.Join(tmpDir, "proc")
+	etcDir := filepath.Join(procRoot, strconv.Itoa(pid), "root", "etc")
+	if err := os.MkdirAll(etcDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	// Symlink target escapes the container root by three levels.
+	if err := os.Symlink("../../../secret", filepath.Join(etcDir, "os-release")); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	_, err := readOSRelease(procRoot, pid)
+	if err == nil {
+		t.Fatal("readOSRelease() expected error for symlink escape, got nil")
+	}
+	if errors.Is(err, errNoOSRelease) {
+		t.Error("readOSRelease() returned errNoOSRelease for symlink escape — symlink was silently skipped rather than rejected")
+	}
+	// Also verify the secret content was not read.
+}
 
 // TestNormalizeDigest verifies the digest extraction logic for the various
 // image reference formats that a CRI runtime may return as the resolved image.
