@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"sync/atomic"
 	"time"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -12,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
@@ -90,7 +95,23 @@ var exporterCmd = &cobra.Command{
 		if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 			return fmt.Errorf("adding healthz check: %w", err)
 		}
-		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+
+		var cacheSynced atomic.Bool
+		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			if mgr.GetCache().WaitForCacheSync(ctx) {
+				cacheSynced.Store(true)
+			}
+			return nil
+		})); err != nil {
+			return fmt.Errorf("adding cache-sync tracker: %w", err)
+		}
+
+		if err := mgr.AddReadyzCheck("cache-sync", func(_ *http.Request) error {
+			if !cacheSynced.Load() {
+				return errors.New("informer cache not synced")
+			}
+			return nil
+		}); err != nil {
 			return fmt.Errorf("adding readyz check: %w", err)
 		}
 
