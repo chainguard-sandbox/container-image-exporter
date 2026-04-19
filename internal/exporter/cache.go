@@ -22,9 +22,11 @@ type CachedContainerImage struct {
 type ContainerImageCache interface {
 	Get(ctx context.Context, ref name.Reference) (*CachedContainerImage, error)
 	Put(ctx context.Context, ref name.Reference, img *ContainerImage) error
-	// Evict removes any cached entries whose references are not in the provided
-	// set, preventing unbounded growth as workloads come and go.
-	Evict(ctx context.Context, refs []name.Reference) error
+	// Evict removes cached entries not in refs AND cached before olderThan.
+	// Entries cached at or after olderThan are protected so that reconcilers
+	// running concurrently with Collect don't have their writes immediately
+	// dropped.
+	Evict(ctx context.Context, refs []name.Reference, olderThan time.Time) error
 }
 
 type cacheImpl struct {
@@ -86,10 +88,10 @@ func (c *cacheImpl) Put(ctx context.Context, ref name.Reference, img *ContainerI
 	return nil
 }
 
-// Evict removes cached entries for any image references not present in refs.
-// A digest is only removed from the image map once all references pointing to
-// it have been evicted.
-func (c *cacheImpl) Evict(ctx context.Context, refs []name.Reference) error {
+// Evict removes cached entries for any image references not present in refs
+// that were also cached before olderThan. A digest is only removed from the
+// image map once all references pointing to it have been evicted.
+func (c *cacheImpl) Evict(ctx context.Context, refs []name.Reference, olderThan time.Time) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -101,11 +103,17 @@ func (c *cacheImpl) Evict(ctx context.Context, refs []name.Reference) error {
 	// Remove stale ref→digest mappings, tracking which digests remain referenced.
 	activeDigests := map[string]struct{}{}
 	for refStr, digestStr := range c.digestMap {
-		if _, ok := activeRefs[refStr]; ok {
+		if _, active := activeRefs[refStr]; active {
 			activeDigests[digestStr] = struct{}{}
-		} else {
-			delete(c.digestMap, refStr)
+			continue
 		}
+		img, ok := c.imageMap[digestStr]
+		if ok && !img.Time.Before(olderThan) {
+			// Cached during or after the current Collect pass — protect it.
+			activeDigests[digestStr] = struct{}{}
+			continue
+		}
+		delete(c.digestMap, refStr)
 	}
 
 	// Remove digest→image entries that are no longer pointed to by any ref.

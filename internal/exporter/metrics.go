@@ -84,6 +84,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	epoch := time.Now()
 
 	// Issue a metric that describes how long we keep items in the cache.
 	// Useful for debugging cache issues.
@@ -216,7 +217,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	// Evict cache entries for images no longer referenced by any active
 	// workload. All lists succeeded so activeRefs is complete.
-	if err := e.Cache.Evict(ctx, activeRefs); err != nil {
+	if err := e.Cache.Evict(ctx, activeRefs, epoch); err != nil {
 		ctrl.Log.Error(err, "evicting stale cache entries")
 	}
 
