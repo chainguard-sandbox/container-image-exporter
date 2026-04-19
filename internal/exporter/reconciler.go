@@ -61,6 +61,7 @@ type ContainerImageReconciler struct {
 	K8sKeychain             bool
 	Transport               http.RoundTripper
 	Inflight                *singleflight.Group
+	RegistryTimeout         time.Duration
 }
 
 // Reconcile reconciles objects that define containers
@@ -168,6 +169,11 @@ func (r *ContainerImageReconciler) getImage(ctx context.Context, imgRef string, 
 // fetchImage fetches image metadata from the registry and writes the result to
 // the cache.
 func (r *ContainerImageReconciler) fetchImage(ctx context.Context, ref name.Reference, opts ...remote.Option) (*ContainerImage, error) {
+	if r.RegistryTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.RegistryTimeout)
+		defer cancel()
+	}
 	if r.Transport != nil {
 		opts = append(opts, remote.WithTransport(r.Transport))
 	}

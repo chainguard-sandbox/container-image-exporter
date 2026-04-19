@@ -37,6 +37,7 @@ var (
 	k8sKeychain         bool
 	registryConcurrency int
 	registryRPS         float64
+	registryTimeout     time.Duration
 	namespaces          []string
 	annotationAllowlist []string
 	labelAllowlist      []string
@@ -87,6 +88,7 @@ var exporterCmd = &cobra.Command{
 			exporter.WithPlatform(p),
 			exporter.WithRegistryConcurrency(registryConcurrency),
 			exporter.WithRegistryRPS(registryRPS),
+			exporter.WithRegistryTimeout(registryTimeout),
 			exporter.WithAnnotationAllowlist(annotationAllowlist),
 			exporter.WithLabelAllowlist(labelAllowlist),
 		); err != nil {
@@ -128,6 +130,7 @@ func init() {
 	exporterCmd.Flags().BoolVar(&k8sKeychain, "k8s-keychain", true, "Whether to fetch credentials from pulls secrets in the cluster.")
 	exporterCmd.Flags().IntVar(&registryConcurrency, "registry-concurrency", 10, "Maximum number of concurrent requests per registry. Set to 0 to disable.")
 	exporterCmd.Flags().Float64Var(&registryRPS, "registry-rps", 5, "Maximum requests per second per registry. Set to 0 to disable.")
+	exporterCmd.Flags().DurationVar(&registryTimeout, "registry-timeout", 30*time.Second, "Per-image timeout for registry requests. Set to 0 to disable.")
 	exporterCmd.Flags().StringArrayVar(&namespaces, "namespaces", nil, "Namespaces to watch (can be specified multiple times). Watches all namespaces if not set.")
 	exporterCmd.Flags().StringArrayVar(&annotationAllowlist, "annotation-allowlist", nil, "Annotation keys to include in container_image_annotation metrics (can be specified multiple times). Emits all annotations if not set.")
 	exporterCmd.Flags().StringArrayVar(&labelAllowlist, "label-allowlist", nil, "Label keys to include in container_image_label metrics (can be specified multiple times). Emits all labels if not set.")
