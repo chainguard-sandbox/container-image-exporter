@@ -48,7 +48,7 @@ var (
 	)
 	metricCacheOldestEntry = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "", "cache_oldest_entry_timestamp"),
-		"Unix timestamp of the oldest entry in the image cache. Use with container_image_cache_duration_seconds to detect stale caches: (time() - container_image_cache_oldest_entry_timestamp) > container_image_cache_duration_seconds.",
+		"Unix timestamp of the oldest entry in the image cache. The zero value of time.Time (a large negative number) indicates the cache is empty. Use with container_image_cache_duration_seconds to detect stale caches: (time() - container_image_cache_oldest_entry_timestamp) > container_image_cache_duration_seconds.",
 		nil, nil,
 	)
 	metricCacheDuration = prometheus.NewDesc(
@@ -209,11 +209,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	// Emit cache staleness metrics. The oldest entry timestamp combined with
 	// the cache duration allows alerting on stuck reconcilers:
 	//   (time() - container_image_cache_oldest_entry_timestamp) > container_image_cache_duration_seconds
-	if !oldestEntry.IsZero() {
-		ch <- prometheus.MustNewConstMetric(
-			metricCacheOldestEntry, prometheus.GaugeValue, float64(oldestEntry.Unix()),
-		)
-	}
+	ch <- prometheus.MustNewConstMetric(
+		metricCacheOldestEntry, prometheus.GaugeValue, float64(oldestEntry.Unix()),
+	)
 
 	// Evict cache entries for images no longer referenced by any active
 	// workload. All lists succeeded so activeRefs is complete.
