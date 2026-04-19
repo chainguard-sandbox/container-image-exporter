@@ -410,6 +410,7 @@ func SetupControllers(mgr ctrl.Manager, opts ...Option) error {
 			K8sKeychain:             o.k8sKeychain,
 			Transport:               transport,
 			Inflight:                inflight,
+			RegistryTimeout:         o.registryTimeout,
 		}
 		if err := ctrl.NewControllerManagedBy(mgr).For(r.object).Complete(reconciler); err != nil {
 			return fmt.Errorf("unable to create controller for %s: %w", r.groupVersionKind, err)

@@ -16,6 +16,7 @@ type options struct {
 	platform             *v1.Platform
 	registryConcurrency  int
 	registryRPS          float64
+	registryTimeout      time.Duration
 	metricsRegistry      prometheus.Registerer
 	annotationAllowlist  []string
 	labelAllowlist       []string
@@ -62,6 +63,14 @@ func WithRegistryConcurrency(n int) Option {
 func WithRegistryRPS(rps float64) Option {
 	return func(o *options) {
 		o.registryRPS = rps
+	}
+}
+
+// WithRegistryTimeout sets the per-image timeout for registry requests.
+// A value of 0 disables the timeout.
+func WithRegistryTimeout(d time.Duration) Option {
+	return func(o *options) {
+		o.registryTimeout = d
 	}
 }
 
