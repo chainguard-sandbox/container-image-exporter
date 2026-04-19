@@ -42,6 +42,21 @@ func TestParseOSRelease(t *testing.T) {
 			input: "NAME=SomeOS\nVERSION=1.0\n",
 			want:  map[string]string{"NAME": "SomeOS", "VERSION": "1.0"},
 		},
+		{
+			name:  "single-quoted values",
+			input: "ID='wolfi'\nNAME='Wolfi Linux'\n",
+			want:  map[string]string{"ID": "wolfi", "NAME": "Wolfi Linux"},
+		},
+		{
+			name:  "mismatched quotes not stripped",
+			input: "ID=\"wolfi'\nNAME='Wolfi Linux\"\n",
+			want:  map[string]string{"ID": "\"wolfi'", "NAME": "'Wolfi Linux\""},
+		},
+		{
+			name:  "value containing equals sign",
+			input: "OPTIONS=a=b\nNAME=foo\n",
+			want:  map[string]string{"OPTIONS": "a=b", "NAME": "foo"},
+		},
 	}
 
 	for _, tt := range tests {
