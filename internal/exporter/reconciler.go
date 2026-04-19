@@ -94,6 +94,7 @@ func (r *ContainerImageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// multiple container paths (e.g. init container and sidecar) is only
 	// fetched once per reconcile.
 	seen := map[string]struct{}{}
+	var errs []error
 	for _, container := range containerSpecs(obj, r.ContainerPaths) {
 		if _, ok := seen[container.Image]; ok {
 			continue
@@ -102,7 +103,9 @@ func (r *ContainerImageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		logger.Info("Fetching image metadata", "image", container.Image)
 		img, err := r.getImage(ctx, container.Image, remote.WithAuthFromKeychain(kc))
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("fetching image details: %w", err)
+			logger.Error(err, "fetching image details", "image", container.Image)
+			errs = append(errs, fmt.Errorf("%s: %w", container.Image, err))
+			continue
 		}
 		logger.Info("Fetched image metadata", "image", container.Image, "digest", img.Digest)
 	}
@@ -110,10 +113,11 @@ func (r *ContainerImageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Tags are mutable so we should periodically check to see if the digest
 	// of any of the container images has changed by requeueing the object.
 	d := addJitter(r.CacheDuration)
+	if len(errs) > 0 {
+		return ctrl.Result{}, errors.Join(errs...)
+	}
 	logger.Info("Reconciled", "requeue_after", d)
-	return ctrl.Result{
-		RequeueAfter: d,
-	}, nil
+	return ctrl.Result{RequeueAfter: d}, nil
 }
 
 // addJitter adds random jitter to a duration, extending it by up to 1/6 of

@@ -2,6 +2,7 @@ package exporter_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -371,5 +372,64 @@ func TestNamespaceFiltering(t *testing.T) {
 		"digest": imgIgnored.digest,
 	}) != nil {
 		t.Error("unexpected size metric for image in ns-ignored: reconciler should not process pods outside the watched namespace")
+	}
+}
+
+// TestReconciler_PerImageErrorIsolation verifies that when one container's
+// image fails to fetch (non-existent ref), the reconciler still processes the
+// remaining containers and their images appear in metrics with a populated
+// digest.
+func TestReconciler_PerImageErrorIsolation(t *testing.T) {
+	good := pushImage(t, "test/error-isolation-good", nil, nil, time.Time{})
+	badRef := fmt.Sprintf("%s/test/error-isolation-bad:latest", testRegistryHost) // never pushed
+
+	gather := setupAllowlistManager(t)
+
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "error-isolation-deploy", Namespace: "default"},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "error-isolation"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "error-isolation"}},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "good", Image: good.ref},
+						{Name: "bad", Image: badRef},
+					},
+				},
+			},
+		},
+	}
+	if err := testK8sClient.Create(testCtx, deploy); err != nil {
+		t.Fatalf("creating deployment: %v", err)
+	}
+	t.Cleanup(func() { testK8sClient.Delete(testCtx, deploy) })
+
+	// The good image must be resolved and appear in metrics with its digest,
+	// proving the reconciler continued past the error from the bad image.
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if findMetric(gather(), "container_image_container_info", map[string]string{
+			"image":  good.ref,
+			"digest": good.digest,
+		}) != nil {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	if findMetric(gather(), "container_image_container_info", map[string]string{
+		"image":  good.ref,
+		"digest": good.digest,
+	}) == nil {
+		t.Fatalf("timed out waiting for good image metric — reconciler may have stopped at the bad image")
+	}
+
+	// The bad image must appear in container_info (it's a known container) but
+	// with an empty digest since it was never fetched into the cache.
+	if findMetric(gather(), "container_image_container_info", map[string]string{
+		"image":  badRef,
+		"digest": "",
+	}) == nil {
+		t.Error("expected container_info for bad image with empty digest")
 	}
 }
