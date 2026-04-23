@@ -20,20 +20,15 @@ const (
 	pauseContainerName = "POD"
 )
 
-// PIDInfo holds the init process ID of a running container as reported by the
-// CRI runtime via ContainerStatus verbose info.
-type PIDInfo struct {
-	PID int
-}
-
 // ContainerInfo holds the relevant fields for a running container on this node.
 type ContainerInfo struct {
 	// ID is the CRI/containerd container ID.
 	ID string
 
 	// PID is the container's init process ID on the node. It is nil when the
-	// CRI runtime did not report one. Callers must check for nil before use.
-	PID *PIDInfo
+	// CRI runtime did not report one. A value of 0 indicates the kernel
+	// swapper process; callers should skip both cases.
+	PID *int
 
 	// UserSpecifiedImage is the image reference as specified by the user
 	// (e.g. "cgr.dev/chainguard/nginx:latest").
@@ -41,6 +36,10 @@ type ContainerInfo struct {
 
 	// Image is the imageID or imageDigest
 	Image string
+
+	// ImageRef is the CRI Container.image_ref field — the digested reference
+	// to the image in use (e.g. "sha256:abc123").
+	ImageRef string
 
 	PodName       string
 	PodNamespace  string
@@ -89,16 +88,17 @@ func (c *CRIClient) ListRunningContainers(ctx context.Context) ([]*ContainerInfo
 			image = ctr.Image.Image
 		}
 
-		pidInfo, err := containerPID(ctx, c.runtime, ctr.Id)
+		pid, err := containerPID(ctx, c.runtime, ctr.Id)
 		if err != nil {
 			slog.Warn("fetching container PID", "container_id", ctr.Id, "err", err)
 		}
 
 		containers = append(containers, &ContainerInfo{
 			ID:                 ctr.Id,
-			PID:                pidInfo,
+			PID:                pid,
 			UserSpecifiedImage: userSpecifiedImage,
 			Image:              image,
+			ImageRef:           ctr.ImageRef,
 			PodName:            podName,
 			PodNamespace:       podNamespace,
 			ContainerName:      containerName,
@@ -114,7 +114,7 @@ func (c *CRIClient) ListRunningContainers(ctx context.Context) ([]*ContainerInfo
 // The "pid" key in the Info map is a de facto standard across containerd,
 // CRI-O, and other CRI runtimes — it is not part of the formal CRI spec but is
 // universally present in practice.
-func containerPID(ctx context.Context, rt runtimeapi.RuntimeServiceClient, id string) (*PIDInfo, error) {
+func containerPID(ctx context.Context, rt runtimeapi.RuntimeServiceClient, id string) (*int, error) {
 	resp, err := rt.ContainerStatus(ctx, &runtimeapi.ContainerStatusRequest{
 		ContainerId: id,
 		Verbose:     true,
@@ -127,10 +127,10 @@ func containerPID(ctx context.Context, rt runtimeapi.RuntimeServiceClient, id st
 		return nil, nil
 	}
 	var v struct {
-		PID int `json:"pid"`
+		PID *int `json:"pid"`
 	}
 	if err := json.Unmarshal([]byte(raw), &v); err != nil {
 		return nil, fmt.Errorf("parsing info JSON: %w", err)
 	}
-	return &PIDInfo{PID: v.PID}, nil
+	return v.PID, nil
 }

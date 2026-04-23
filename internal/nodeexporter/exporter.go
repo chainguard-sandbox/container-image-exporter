@@ -2,12 +2,13 @@ package nodeexporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,6 +16,8 @@ import (
 )
 
 const metricNamespace = "container_image"
+
+var errNoOSRelease = errors.New("no os-release file under container root")
 
 var (
 	metricContainerOSInfo = prometheus.NewDesc(
@@ -69,17 +72,22 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, container := range containers {
-		digest := normalizeDigest(container.Image)
-
-		if container.PID == nil {
-			slog.Warn("skipping container: PID not available from CRI", "container_id", container.ID)
+		// nil means the CRI runtime didn't report a PID. 0 is the kernel
+		// swapper — it has no /proc/0/root. Skip both.
+		if container.PID == nil || *container.PID == 0 {
+			slog.Debug("skipping container: PID not available", "container_id", container.ID)
 			continue
 		}
 
 		// Read OS release info from the container's filesystem via procfs.
-		osr, err := readOSRelease(c.procRoot, container.PID.PID)
-		if err != nil {
-			slog.Error("reading /etc/os-release file", "err", err)
+		osr, err := readOSRelease(c.procRoot, *container.PID)
+		switch {
+		case errors.Is(err, errNoOSRelease):
+			// Distroless/scratch — emit the metric with empty os-release labels so
+			// the container is still visible in adoption queries.
+			osr = nil
+		case err != nil:
+			slog.Error("reading /etc/os-release file", "err", err, "container_id", container.ID)
 			continue
 		}
 
@@ -90,7 +98,7 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 			container.PodName,
 			container.ContainerName,
 			container.UserSpecifiedImage,
-			digest,
+			container.ImageRef,
 			osr["BUILD_ID"],
 			osr["ID"],
 			osr["ID_LIKE"],
@@ -109,28 +117,23 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(metricUp, prometheus.GaugeValue, 1)
 }
 
-func normalizeDigest(imageRef string) string {
-	if i := strings.LastIndex(imageRef, "@"); i >= 0 {
-		return imageRef[i+1:]
-	}
-	return imageRef
-}
-
 func readOSRelease(procRoot string, pid int) (map[string]string, error) {
-	root := filepath.Join(procRoot, strconv.Itoa(pid), "root")
+	root, err := os.OpenRoot(filepath.Join(procRoot, strconv.Itoa(pid), "root"))
+	if err != nil {
+		return nil, fmt.Errorf("opening container root: %w", err)
+	}
+	defer root.Close()
+
 	for _, rel := range []string{"etc/os-release", "usr/lib/os-release"} {
-		path := filepath.Join(root, rel)
-		f, err := os.Open(path)
-		if os.IsNotExist(err) {
+		f, err := root.Open(rel)
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			// Other errors are transient (container stopping between list and read).
-			return nil, fmt.Errorf("opening %s: %w", path, err)
+			return nil, fmt.Errorf("opening %s: %w", rel, err)
 		}
 		defer f.Close()
-		return ParseOSRelease(f), nil
+		return ParseOSRelease(f)
 	}
-	// Neither file exists — expected for scratch/distroless images.
-	return nil, fmt.Errorf("no os-release found under %s (tried etc/os-release, usr/lib/os-release)", root)
+	return nil, errNoOSRelease
 }

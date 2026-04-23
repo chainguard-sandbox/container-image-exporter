@@ -106,8 +106,12 @@ func TestNode_Collect(t *testing.T) {
 			t.Errorf("os_info metric emitted for pause container (container_id=%s)", labels["container_id"])
 		}
 
-		// The digest label, if set, should look like a sha256 digest.
-		if d := labels["digest"]; d != "" && !strings.HasPrefix(d, "sha256:") {
+		// The digest label is sourced from CRI ImageRef and must be non-empty
+		// and start with "sha256:".
+		d := labels["digest"]
+		if d == "" {
+			t.Errorf("digest label is empty for container %s — ImageRef not populated by runtime", labels["container_id"])
+		} else if !strings.HasPrefix(d, "sha256:") {
 			t.Errorf("digest label %q does not start with 'sha256:' for container %s", d, labels["container_id"])
 		}
 

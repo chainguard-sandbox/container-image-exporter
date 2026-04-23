@@ -3,6 +3,7 @@ package nodeexporter
 import (
 	"strings"
 	"testing"
+	"testing/iotest"
 )
 
 func TestParseOSRelease(t *testing.T) {
@@ -41,16 +42,41 @@ func TestParseOSRelease(t *testing.T) {
 			input: "NAME=SomeOS\nVERSION=1.0\n",
 			want:  map[string]string{"NAME": "SomeOS", "VERSION": "1.0"},
 		},
+		{
+			name:  "single-quoted values",
+			input: "ID='wolfi'\nNAME='Wolfi Linux'\n",
+			want:  map[string]string{"ID": "wolfi", "NAME": "Wolfi Linux"},
+		},
+		{
+			name:  "mismatched quotes not stripped",
+			input: "ID=\"wolfi'\nNAME='Wolfi Linux\"\n",
+			want:  map[string]string{"ID": "\"wolfi'", "NAME": "'Wolfi Linux\""},
+		},
+		{
+			name:  "value containing equals sign",
+			input: "OPTIONS=a=b\nNAME=foo\n",
+			want:  map[string]string{"OPTIONS": "a=b", "NAME": "foo"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ParseOSRelease(strings.NewReader(tt.input))
+			result, err := ParseOSRelease(strings.NewReader(tt.input))
+			if err != nil {
+				t.Fatalf("ParseOSRelease() unexpected error: %v", err)
+			}
 			for k, wantV := range tt.want {
 				if got := result[k]; got != wantV {
 					t.Errorf("ParseOSRelease()[%q] = %q, want %q", k, got, wantV)
 				}
 			}
 		})
+	}
+}
+
+func TestParseOSRelease_ScanError(t *testing.T) {
+	_, err := ParseOSRelease(iotest.ErrReader(iotest.ErrTimeout))
+	if err == nil {
+		t.Fatal("ParseOSRelease() expected error from failing reader, got nil")
 	}
 }
