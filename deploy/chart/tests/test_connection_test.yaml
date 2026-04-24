@@ -1,0 +1,65 @@
+suite: helm test Pod
+templates:
+  - templates/tests/test-connection.yaml
+release:
+  name: cie
+set:
+  image.repository: foo
+tests:
+  - it: carries helm test hook annotations
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+
+  - it: curls /healthz with -f
+    asserts:
+      - contains:
+          path: spec.containers[0].args
+          content: -f
+      - matchRegex:
+          path: spec.containers[0].args[1]
+          pattern: /healthz$
+
+  - it: healthPort is used in the probe URL
+    set:
+      exporter.healthPort: 9091
+    asserts:
+      - matchRegex:
+          path: spec.containers[0].args[1]
+          pattern: :9091/healthz$
+
+  - it: imagePullSecrets propagate
+    set:
+      imagePullSecrets:
+        - name: my-secret
+    asserts:
+      - contains:
+          path: spec.imagePullSecrets
+          content:
+            name: my-secret
+
+  - it: is omitted when exporter.enabled is false
+    set:
+      exporter.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: uses configurable curl image
+    set:
+      tests.curl.image.repository: my.registry/curl
+      tests.curl.image.tag: "1.0"
+    asserts:
+      - equal:
+          path: spec.containers[0].image
+          value: my.registry/curl:1.0
+
+  - it: restartPolicy is Never
+    asserts:
+      - equal:
+          path: spec.restartPolicy
+          value: Never

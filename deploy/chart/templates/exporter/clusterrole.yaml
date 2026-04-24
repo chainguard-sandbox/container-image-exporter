@@ -1,0 +1,26 @@
+{{- if and .Values.exporter.enabled .Values.exporter.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "container-image-exporter.fullname" . }}
+  labels:
+    {{- include "container-image-exporter.exporter.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+{{- if .Values.exporter.k8sKeychain }}
+- apiGroups: [""]
+  resources: ["secrets", "serviceaccounts"]
+  verbs: ["get", "list"]
+{{- end }}
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+{{- with .Values.exporter.rbac.extraRules }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
+{{- end }}

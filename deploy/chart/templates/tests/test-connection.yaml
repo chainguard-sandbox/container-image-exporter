@@ -1,0 +1,24 @@
+{{- if .Values.exporter.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "container-image-exporter.fullname" . }}-test-connection"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.exporter.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  containers:
+    - name: curl
+      image: "{{ .Values.tests.curl.image.repository }}:{{ .Values.tests.curl.image.tag }}"
+      args:
+        - -f
+        - http://{{ include "container-image-exporter.fullname" . }}:{{ .Values.exporter.healthPort }}/healthz
+  restartPolicy: Never
+{{- end }}

@@ -1,0 +1,100 @@
+{{- if .Values.exporter.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "container-image-exporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.exporter.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.exporter.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "container-image-exporter.exporter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.exporter.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "container-image-exporter.exporter.labels" . | nindent 8 }}
+        {{- with .Values.exporter.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "container-image-exporter.serviceAccountName" . }}
+      {{- with .Values.exporter.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: exporter
+          {{- with .Values.exporter.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - exporter
+            - --metrics-bind-address=:{{ .Values.exporter.metricsPort }}
+            - --health-probe-bind-address=:{{ .Values.exporter.healthPort }}
+            - --k8s-keychain={{ .Values.exporter.k8sKeychain }}
+            - --platform={{ .Values.exporter.platform }}
+            - --cache-duration={{ .Values.exporter.cacheDuration }}
+            - --registry-concurrency={{ .Values.exporter.registryConcurrency }}
+            - --registry-rps={{ .Values.exporter.registryRps }}
+            {{- range .Values.exporter.namespaces }}
+            - --namespaces={{ . }}
+            {{- end }}
+            {{- range .Values.exporter.annotationAllowlist }}
+            - --annotation-allowlist={{ . }}
+            {{- end }}
+            {{- range .Values.exporter.labelAllowlist }}
+            - --label-allowlist={{ . }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.exporter.metricsPort }}
+              protocol: TCP
+            - name: health
+              containerPort: {{ .Values.exporter.healthPort }}
+              protocol: TCP
+          {{- with .Values.exporter.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.exporter.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.exporter.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.exporter.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.exporter.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.exporter.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.exporter.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.exporter.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

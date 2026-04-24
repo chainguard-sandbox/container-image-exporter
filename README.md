@@ -103,7 +103,42 @@ export IMAGE_REF=your.registry/container-image-exporter:latest
 docker build -t "${IMAGE_REF}" --push .
 ```
 
-### Exporter
+### Helm
+
+Install using the Helm chart, providing your image repository and tag:
+
+```
+helm install container-image-exporter ./deploy/chart \
+    --namespace container-image-exporter \
+    --create-namespace \
+    --set image.repository=your.registry/container-image-exporter \
+    --set image.tag=latest
+```
+
+Both components are enabled by default. To deploy only one of them:
+
+```
+# Disable the node-exporter Daemonset
+--set nodeExporter.enabled=false
+
+# Or, disable the exporter Deployment
+--set exporter.enabled=false
+```
+
+If you are using the Prometheus Operator, enable the ServiceMonitors:
+
+```
+--set exporter.serviceMonitor.enabled=true \
+--set nodeExporter.serviceMonitor.enabled=true
+```
+
+If you are using Grafana (via kube-prometheus-stack), enable automatic dashboard provisioning:
+
+```
+--set grafana.dashboards.enabled=true
+```
+
+### Manifests
 
 Install the cluster-wide exporter:
 
@@ -113,9 +148,7 @@ curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-export
     | kubectl apply -f -
 ```
 
-### Node Exporter
-
-Install the per-node DaemonSet: 
+And/or the per-node DaemonSet:
 
 ```
 curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/node-exporter.yaml \
@@ -123,19 +156,9 @@ curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-export
     | kubectl apply -f -
 ```
 
-### Prometheus Discovery
-
-Both components annotate their Services for common Prometheus auto-discovery:
-
-```yaml
-prometheus.io/scrape: "true"
-prometheus.io/port: "8080"
-prometheus.io/path: "/metrics"
-```
-
 If you are using the [Prometheus
 Operator](https://github.com/prometheus-operator/prometheus-operator), scrape
-the exporter with a `ServiceMonitor`:
+the components with a `ServiceMonitor`:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -152,11 +175,7 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: container-image-exporter
-```
-
-And the node exporter with a separate `ServiceMonitor`:
-
-```yaml
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -171,6 +190,15 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: container-image-node-exporter
+```
+
+Otherwise, both components annotate their Services for common Prometheus
+auto-discovery:
+
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "8080"
+prometheus.io/path: "/metrics"
 ```
 
 ## Metrics
@@ -257,8 +285,8 @@ normally for all other resource types.
 
 ## Dashboards
 
-See [dashboards](./dashboards) for examples of Grafana dashboards that consume
-the exporter's metrics.
+See [dashboards](./deploy/chart/dashboards) for examples of Grafana dashboards
+that consume the exporter's metrics.
 
 ![dashboard](images/dashboard.png)
 

@@ -1,0 +1,89 @@
+{{- if .Values.nodeExporter.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "container-image-exporter.nodeExporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.nodeExporter.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "container-image-exporter.nodeExporter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.nodeExporter.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "container-image-exporter.nodeExporter.labels" . | nindent 8 }}
+        {{- with .Values.nodeExporter.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "container-image-exporter.nodeExporter.serviceAccountName" . }}
+      {{- with .Values.nodeExporter.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: node-exporter
+          {{- with .Values.nodeExporter.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - node-exporter
+            - --metrics-bind-address=:{{ .Values.nodeExporter.metricsPort }}
+            - --cri-socket={{ .Values.nodeExporter.criSocket }}
+            - --proc-root={{ .Values.nodeExporter.procRoot }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.nodeExporter.metricsPort }}
+              protocol: TCP
+          {{- with .Values.nodeExporter.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.nodeExporter.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.nodeExporter.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: proc
+              mountPath: {{ .Values.nodeExporter.procRoot }}
+              readOnly: true
+            - name: cri-sock
+              mountPath: {{ .Values.nodeExporter.criSocket | dir }}
+              readOnly: true
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: cri-sock
+          hostPath:
+            path: {{ .Values.nodeExporter.criSocket | dir }}
+      {{- with .Values.nodeExporter.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeExporter.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeExporter.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

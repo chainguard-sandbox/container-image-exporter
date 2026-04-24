@@ -1,0 +1,96 @@
+suite: RBAC
+release:
+  name: cie
+set:
+  image.repository: foo
+tests:
+  - it: default renders ClusterRole + ClusterRoleBinding (one each)
+    templates:
+      - templates/exporter/clusterrole.yaml
+      - templates/exporter/clusterrolebinding.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: rbac.create=false omits both ClusterRole and ClusterRoleBinding
+    templates:
+      - templates/exporter/clusterrole.yaml
+      - templates/exporter/clusterrolebinding.yaml
+    set:
+      exporter.rbac.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: k8sKeychain=true includes the secrets/serviceaccounts rule
+    template: templates/exporter/clusterrole.yaml
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets", "serviceaccounts"]
+            verbs: ["get", "list"]
+
+  - it: k8sKeychain=false drops the secrets/serviceaccounts rule
+    template: templates/exporter/clusterrole.yaml
+    set:
+      exporter.k8sKeychain: false
+    asserts:
+      - notContains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets", "serviceaccounts"]
+            verbs: ["get", "list"]
+
+  - it: extraRules are appended to the ClusterRole
+    template: templates/exporter/clusterrole.yaml
+    set:
+      exporter.rbac.extraRules:
+        - apiGroups: ["tekton.dev"]
+          resources: ["tasks"]
+          verbs: ["get"]
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["tekton.dev"]
+            resources: ["tasks"]
+            verbs: ["get"]
+
+  - it: exporter ServiceAccount is created by default
+    template: templates/exporter/serviceaccount.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: cie-container-image-exporter
+
+  - it: exporter ServiceAccount is skipped when disabled
+    template: templates/exporter/serviceaccount.yaml
+    set:
+      exporter.serviceAccount.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: node-exporter ServiceAccount is skipped when disabled
+    template: templates/node-exporter/serviceaccount.yaml
+    set:
+      nodeExporter.serviceAccount.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: ClusterRoleBinding subject points at the exporter ServiceAccount
+    template: templates/exporter/clusterrolebinding.yaml
+    asserts:
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: cie-container-image-exporter
+            namespace: NAMESPACE
+        template: templates/exporter/clusterrolebinding.yaml

@@ -1,0 +1,95 @@
+suite: services
+release:
+  name: cie
+  namespace: ci-test
+set:
+  image.repository: foo
+tests:
+  - it: exporter service renders with both ports
+    template: templates/exporter/service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - contains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 8080
+            targetPort: metrics
+            protocol: TCP
+      - contains:
+          path: spec.ports
+          content:
+            name: health
+            port: 8081
+            targetPort: health
+            protocol: TCP
+
+  - it: node-exporter service is headless
+    template: templates/node-exporter/service.yaml
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: None
+
+  - it: scrapeAnnotations=true renders prometheus.io annotations (default)
+    template: templates/exporter/service.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "8080"
+      - equal:
+          path: metadata.annotations["prometheus.io/path"]
+          value: /metrics
+
+  - it: scrapeAnnotations=false removes prometheus.io annotations
+    template: templates/exporter/service.yaml
+    set:
+      exporter.service.scrapeAnnotations: false
+    asserts:
+      - notExists:
+          path: metadata.annotations["prometheus.io/scrape"]
+      - notExists:
+          path: metadata.annotations["prometheus.io/port"]
+
+  - it: user-supplied service.annotations merge in
+    template: templates/exporter/service.yaml
+    set:
+      exporter.service.annotations:
+        my-annotation: my-value
+    asserts:
+      - equal:
+          path: metadata.annotations.my-annotation
+          value: my-value
+      - equal:
+          path: metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: exporter service type can be overridden
+    template: templates/exporter/service.yaml
+    set:
+      exporter.service.type: NodePort
+    asserts:
+      - equal:
+          path: spec.type
+          value: NodePort
+
+  - it: exporter service carries component=exporter label
+    template: templates/exporter/service.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: exporter
+
+  - it: node-exporter service carries component=node-exporter label
+    template: templates/node-exporter/service.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: node-exporter

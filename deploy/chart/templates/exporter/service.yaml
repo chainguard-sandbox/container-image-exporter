@@ -1,0 +1,33 @@
+{{- if .Values.exporter.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "container-image-exporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.exporter.labels" . | nindent 4 }}
+  {{- if or .Values.exporter.service.scrapeAnnotations .Values.exporter.service.annotations }}
+  annotations:
+    {{- if .Values.exporter.service.scrapeAnnotations }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ .Values.exporter.metricsPort | quote }}
+    prometheus.io/path: "/metrics"
+    {{- end }}
+    {{- with .Values.exporter.service.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    {{- include "container-image-exporter.exporter.selectorLabels" . | nindent 4 }}
+  type: {{ .Values.exporter.service.type }}
+  ports:
+    - name: metrics
+      port: {{ .Values.exporter.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+    - name: health
+      port: {{ .Values.exporter.healthPort }}
+      targetPort: health
+      protocol: TCP
+{{- end }}
