@@ -66,8 +66,9 @@ graph TB
 
 ### Node Exporter
 
-A DaemonSet that runs on each node and exports OS release information for each
-container.
+A DaemonSet that runs on each node and exports per-container OS release
+information plus per-image OCI labels and creation timestamps, all sourced
+locally from the CRI runtime.
 
 The most reliable method for inferring whether a running container is
 Chainguard-based, but it does need to be ran as root on the host.
@@ -86,6 +87,7 @@ graph TB
     PROM[Prometheus]
 
     NE -->|"List containers"| CRI
+    NE -->|"List images"| CRI
     NE -->|"Read /etc/os-release"| PROC
     PROM -->|Scrape each node| NE
 
@@ -219,10 +221,17 @@ prometheus.io/path: "/metrics"
 
 ### Node Exporter
 
-| Metric                               | Description                                                                                       | Labels                                                                                   |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| container_image_node_container_info  | Per-running-container info: identity (pod, namespace, image, image_id) and OS release fields read from /etc/os-release inside the container's rootfs. | id, namespace, pod, container, image, image_id, os_build_id, os_id, os_id_like, os_image_id, os_image_version, os_name, os_pretty_name, os_variant, os_variant_id, os_version, os_version_codename, os_version_id |
-| container_image_node_exporter_up     | 1 if the last collection completed successfully, 0 otherwise.                                     | —                                                                                        |
+| Metric                               | Description                                                                                                      | Labels                                                                                                                                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| container_image_node_container_info  | Information about running containers from the local CRI runtime, plus OS release details from `/etc/os-release`. | id, namespace, pod, container, image, image_id, os_build_id, os_id, os_id_like, os_image_id, os_image_version, os_name, os_pretty_name, os_variant, os_variant_id, os_version, os_version_codename, os_version_id |
+| container_image_node_image_labels    | Labels from the image config.                                                                                    | image_id, key, value                                                                                                                                                                                              |
+| container_image_node_image_created   | The created date from the image config. Expressed as a Unix Epoch Time.                                          | image_id                                                                                                                                                                                                          |
+| container_image_node_exporter_up     | 1 if the last collection completed successfully, 0 otherwise.                                                    | —                                                                                                                                                                                                                 |
+
+By default the `container_image_node_image_*` metrics only cover images
+backing a running container. Set `--only-images-in-use=false` (or
+`nodeExporter.onlyImagesInUse: false`) to report every image cached by the
+local CRI runtime.
 
 ## Supported Resources
 
@@ -388,6 +397,44 @@ path, override it with:
 ```
 --proc-root=/host/proc
 ```
+
+#### Only images in use
+
+By default the node-exporter only reports `container_image_node_image_*`
+metrics for images currently backing a running container on the node. To
+report every image cached by the local CRI runtime (useful for tracking
+disk usage from images that aren't currently in use):
+
+```
+--only-images-in-use=false
+```
+
+With the Helm chart:
+
+```
+--set nodeExporter.onlyImagesInUse=false
+```
+
+#### Label allowlist
+
+OCI image labels can carry arbitrary builder-controlled content (SBOMs,
+multi-line descriptions, build IDs that change every build). To restrict
+`container_image_node_image_labels` to a fixed set of keys, pass
+`--label-allowlist` once per allowed key:
+
+```
+--label-allowlist=org.opencontainers.image.title \
+--label-allowlist=org.opencontainers.image.vendor
+```
+
+With the Helm chart:
+
+```
+--set 'nodeExporter.labelAllowlist[0]=org.opencontainers.image.title' \
+--set 'nodeExporter.labelAllowlist[1]=org.opencontainers.image.vendor'
+```
+
+When unset (the default), every label on every reported image is emitted.
 
 ## Development
 

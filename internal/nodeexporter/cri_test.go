@@ -2,7 +2,9 @@ package nodeexporter
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -297,5 +299,192 @@ func TestListRunningContainers_RequestsRunningState(t *testing.T) {
 	got := srv.lastRequest.Filter.State.State
 	if got != runtimeapi.ContainerState_CONTAINER_RUNNING {
 		t.Errorf("filter state = %v, want CONTAINER_RUNNING", got)
+	}
+}
+
+// TestParseImageInfo_Containerd verifies that the containerd verbose info shape
+// (`{"chainID": "...", "imageSpec": <OCI image config>}`) is parsed correctly.
+func TestParseImageInfo_Containerd(t *testing.T) {
+	const raw = `{
+		"chainID": "sha256:dead",
+		"imageSpec": {
+			"created": "2024-01-15T10:00:00Z",
+			"architecture": "amd64",
+			"os": "linux",
+			"config": {
+				"Labels": {
+					"org.opencontainers.image.version": "1.2.3",
+					"org.opencontainers.image.source": "https://example.com/repo"
+				}
+			}
+		}
+	}`
+
+	info := parseImageInfo(map[string]string{"info": raw})
+
+	if info.Created == nil {
+		t.Fatal("Created = nil, want non-nil")
+	}
+	want, _ := time.Parse(time.RFC3339, "2024-01-15T10:00:00Z")
+	if !info.Created.Equal(want) {
+		t.Errorf("Created = %v, want %v", info.Created, want)
+	}
+	if got := info.Labels["org.opencontainers.image.version"]; got != "1.2.3" {
+		t.Errorf("Labels[version] = %q, want %q", got, "1.2.3")
+	}
+	if got := info.Labels["org.opencontainers.image.source"]; got != "https://example.com/repo" {
+		t.Errorf("Labels[source] = %q, want %q", got, "https://example.com/repo")
+	}
+}
+
+// TestParseImageInfo_OCITopLevel verifies fallback parsing when the verbose
+// info JSON is just the OCI image config at the top level (the shape some
+// runtimes other than containerd use).
+func TestParseImageInfo_OCITopLevel(t *testing.T) {
+	const raw = `{
+		"created": "2025-06-01T12:34:56Z",
+		"config": {
+			"Labels": {
+				"key1": "value1"
+			}
+		}
+	}`
+
+	info := parseImageInfo(map[string]string{"info": raw})
+
+	if info.Created == nil {
+		t.Fatal("Created = nil, want non-nil")
+	}
+	want, _ := time.Parse(time.RFC3339, "2025-06-01T12:34:56Z")
+	if !info.Created.Equal(want) {
+		t.Errorf("Created = %v, want %v", info.Created, want)
+	}
+	if got := info.Labels["key1"]; got != "value1" {
+		t.Errorf("Labels[key1] = %q, want %q", got, "value1")
+	}
+}
+
+// TestParseImageInfo_Empty verifies that missing or empty info returns a
+// zero-value imageMetadata and never errors.
+func TestParseImageInfo_Empty(t *testing.T) {
+	for name, verbose := range map[string]map[string]string{
+		"nil-map":  nil,
+		"no-info":  {"other": "data"},
+		"empty":    {"info": ""},
+		"unknown":  {"info": `{"unrelated":"shape"}`},
+		"bad-json": {"info": `not json`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := parseImageInfo(verbose)
+			if got.Created != nil {
+				t.Errorf("Created = %v, want nil", got.Created)
+			}
+			if len(got.Labels) != 0 {
+				t.Errorf("Labels = %v, want empty", got.Labels)
+			}
+		})
+	}
+}
+
+// TestImageStatus_EmptyImageID verifies that an empty image ID short-circuits
+// to a zero-value response without making an RPC.
+func TestImageStatus_EmptyImageID(t *testing.T) {
+	srv := &fakeRuntimeServer{}
+	conn := startFakeRuntime(t, srv)
+	got, err := NewCRIClient(conn).ImageStatus(context.Background(), "")
+	if err != nil {
+		t.Fatalf("ImageStatus: %v", err)
+	}
+	if got.Created != nil || len(got.Labels) != 0 || got.ID != "" {
+		t.Errorf("expected zero-value Image, got %+v", got)
+	}
+	if srv.lastImageStatusReq != nil {
+		t.Errorf("expected no RPC, got %+v", srv.lastImageStatusReq)
+	}
+}
+
+// TestImageStatus_RuntimeReturnsNoImage verifies that when the runtime
+// responds with resp.Image == nil (image disappeared, runtime quirk, etc.)
+// ImageStatus returns a zero-value Image rather than fabricating one keyed
+// by the input ID — so callers don't emit metrics with unverified IDs.
+func TestImageStatus_RuntimeReturnsNoImage(t *testing.T) {
+	// Empty fake server — no images registered, so any ImageStatus lookup
+	// for a non-empty ID will land on the resp.Image = nil branch.
+	srv := &fakeRuntimeServer{}
+	conn := startFakeRuntime(t, srv)
+
+	got, err := NewCRIClient(conn).ImageStatus(context.Background(), "sha256:unknown")
+	if err != nil {
+		t.Fatalf("ImageStatus: %v", err)
+	}
+	if got.ID != "" {
+		t.Errorf("ID = %q, want empty (runtime returned no Image)", got.ID)
+	}
+	if got.Created != nil || len(got.Labels) != 0 {
+		t.Errorf("expected zero-value Image, got %+v", got)
+	}
+}
+
+// TestListImages_ImageStatusErrorSkipsImage verifies that when ImageStatus
+// fails for an individual image, ListImages drops that image entirely
+// rather than emitting a bare entry. The remaining images are still
+// enriched and returned.
+func TestListImages_ImageStatusErrorSkipsImage(t *testing.T) {
+	const (
+		erroringID = "sha256:erroring"
+		workingID  = "sha256:working"
+	)
+	srv := &fakeRuntimeServer{
+		images: []*runtimeapi.Image{
+			{Id: erroringID},
+			{Id: workingID},
+		},
+		imageStatusErrors: map[string]error{
+			erroringID: errors.New("simulated CRI failure"),
+		},
+		imageInfo: map[string]string{
+			workingID: `{"imageSpec":{"created":"2024-01-01T00:00:00Z","config":{"Labels":{"k":"v"}}}}`,
+		},
+	}
+
+	conn := startFakeRuntime(t, srv)
+	images, err := NewCRIClient(conn).ListImages(context.Background())
+	if err != nil {
+		t.Fatalf("ListImages returned error: %v", err)
+	}
+	if len(images) != 1 {
+		t.Fatalf("got %d images, want 1 (erroring image should be skipped)", len(images))
+	}
+	got := images[0]
+	if got.ID != workingID {
+		t.Errorf("ID = %q, want %q (erroring image should not be returned)", got.ID, workingID)
+	}
+	if got.Labels["k"] != "v" {
+		t.Errorf("Labels[k] = %q, want %q", got.Labels["k"], "v")
+	}
+	if got.Created == nil {
+		t.Error("Created = nil, want non-nil")
+	}
+}
+
+// TestListImages_RuntimeReturnsNoImageStatus_Skips verifies that when
+// ListImages surfaces an image but ImageStatus then comes back with no
+// Image (a TOCTOU between the two RPCs, or a quirky runtime), ListImages
+// drops the image — there's nothing useful left to emit for it.
+func TestListImages_RuntimeReturnsNoImageStatus_Skips(t *testing.T) {
+	const imageID = "sha256:disappeared"
+	srv := &fakeRuntimeServer{
+		// listImagesResult surfaces the image; images is empty, so
+		// ImageStatus will return resp.Image = nil for it.
+		listImagesResult: []*runtimeapi.Image{{Id: imageID}},
+	}
+
+	conn := startFakeRuntime(t, srv)
+	images, err := NewCRIClient(conn).ListImages(context.Background())
+	if err != nil {
+		t.Fatalf("ListImages: %v", err)
+	}
+	if len(images) != 0 {
+		t.Fatalf("got %d images, want 0 (image with no ImageStatus should be skipped)", len(images))
 	}
 }

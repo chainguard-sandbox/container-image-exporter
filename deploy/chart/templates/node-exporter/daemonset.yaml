@@ -44,6 +44,10 @@ spec:
             - --metrics-bind-address=:{{ .Values.nodeExporter.metricsPort }}
             - --cri-socket={{ .Values.nodeExporter.criSocket }}
             - --proc-root={{ .Values.nodeExporter.procRoot }}
+            - --only-images-in-use={{ .Values.nodeExporter.onlyImagesInUse }}
+            {{- range .Values.nodeExporter.labelAllowlist }}
+            - --label-allowlist={{ . }}
+            {{- end }}
           ports:
             - name: metrics
               containerPort: {{ .Values.nodeExporter.metricsPort }}

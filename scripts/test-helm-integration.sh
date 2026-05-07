@@ -32,6 +32,27 @@ echo "==> Building and importing image"
 docker build -t "${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}" .
 "${K3D}" image import "${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}" -c "${HELM_TEST_CLUSTER}"
 
+# Pick an OCI label that we know is set on the base image
+# (cgr.dev/chainguard/static) and is inherited by our build, so we have a
+# concrete (key, value) pair to assert against node_image_labels.
+EXPECTED_LABEL_KEY="org.opencontainers.image.vendor"
+EXPECTED_LABEL_VALUE=$(docker image inspect "${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}" \
+    --format "{{index .Config.Labels \"${EXPECTED_LABEL_KEY}\"}}")
+if [ -z "${EXPECTED_LABEL_VALUE}" ]; then
+    echo "FAIL: image has no ${EXPECTED_LABEL_KEY} label; cannot assert node_image_labels content"
+    echo "      Update EXPECTED_LABEL_KEY in $0 to a label the image actually carries."
+    exit 1
+fi
+echo "  ${EXPECTED_LABEL_KEY}=${EXPECTED_LABEL_VALUE}"
+
+# Docker's image .Id is the OCI config blob digest — the same value the CRI
+# ImageService returns as Image.id and our node_image_* metrics key on.
+# Assumes a single-platform image (what `docker build` produces by default);
+# a multi-arch index would expose the index digest here instead.
+IMAGE_ID=$(docker image inspect "${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}" --format='{{.Id}}')
+[ -n "${IMAGE_ID}" ] || { echo "FAIL: docker image inspect returned no .Id"; exit 1; }
+echo "  image_id=${IMAGE_ID}"
+
 # ---------------------------------------------------------------------------
 # Prometheus Operator
 # ---------------------------------------------------------------------------
@@ -97,18 +118,22 @@ kubectl port-forward -n "${HELM_MONITORING_NS}" svc/prometheus-operated 9090:909
 PF_PID=$!
 until curl -sf http://localhost:9090/-/ready >/dev/null 2>&1; do sleep 2; done
 
+prom_query() {
+    curl -sf --get "http://localhost:9090/api/v1/query" \
+        --data-urlencode "query=$1"
+}
+
 wait_for_query() {
     local desc="$1"
     local expr="$2"
+    local attempts=60
     echo "==> Checking: ${desc}"
-    for i in $(seq 1 60); do
-        if curl -sf --get "http://localhost:9090/api/v1/query" \
-                --data-urlencode "query=${expr}" \
-                | grep -q '"result":\[{'; then
+    for i in $(seq 1 "${attempts}"); do
+        if prom_query "${expr}" | grep -q '"result":\[{'; then
             echo "  OK"
             return 0
         fi
-        echo "  attempt ${i}/30, retrying in 2s..."
+        echo "  attempt ${i}/${attempts}, retrying in 2s..."
         sleep 2
     done
     echo "FAIL: ${desc}"
@@ -122,5 +147,13 @@ wait_for_query "exporter observed its own pod image" \
     "container_image_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\"}"
 wait_for_query "node-exporter resolved wolfi os-release from /proc/<pid>/root" \
     "container_image_node_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\",os_id=\"wolfi\"}"
+wait_for_query "node-exporter parsed ${EXPECTED_LABEL_KEY} from the image config" \
+    "container_image_node_image_labels{image_id=\"${IMAGE_ID}\",key=\"${EXPECTED_LABEL_KEY}\",value=\"${EXPECTED_LABEL_VALUE}\"}"
+wait_for_query "node-exporter parsed image creation timestamp" \
+    "container_image_node_image_created{image_id=\"${IMAGE_ID}\"}"
+# node_container_info must report the same image_id as node_image_* for the
+# dashboards' on(image_id) joins to resolve.
+wait_for_query "node-exporter reports the same image_id on node_container_info" \
+    "container_image_node_container_info{image_id=\"${IMAGE_ID}\"}"
 
 echo "==> All metrics verified"
