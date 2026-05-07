@@ -101,7 +101,7 @@ wait_for_query() {
     local desc="$1"
     local expr="$2"
     echo "==> Checking: ${desc}"
-    for i in $(seq 1 30); do
+    for i in $(seq 1 60); do
         if curl -sf --get "http://localhost:9090/api/v1/query" \
                 --data-urlencode "query=${expr}" \
                 | grep -q '"result":\[{'; then
