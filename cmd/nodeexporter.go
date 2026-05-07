@@ -30,8 +30,8 @@ It sources data from:
   - The host /proc filesystem to read /etc/os-release from each container's rootfs
 
 Metrics exported:
-  container_image_container_os_info  - OS release info per running container
-  container_image_node_exporter_up   - 1 if collection succeeded, 0 otherwise`,
+  container_image_node_container_info  - Per-running-container info (identity + OS release fields)
+  container_image_node_exporter_up     - 1 if collection succeeded, 0 otherwise`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Connect to the CRI socket. grpc.NewClient is non-blocking; the
 		// actual connection is established on the first RPC call.

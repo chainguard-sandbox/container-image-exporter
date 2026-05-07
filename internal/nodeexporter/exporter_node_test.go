@@ -69,50 +69,51 @@ func TestNode_Collect(t *testing.T) {
 		t.Fatalf("node_exporter_up = %v, want 1 (CRI ListContainers failed)", up.GetGauge().GetValue())
 	}
 
-	// Find all os_info metrics. It is valid (though unusual) for a node to
-	// have no containers with a readable /etc/os-release — scratch images and
-	// distroless images do not have one. Log rather than fail in that case.
-	var osInfoFamily *dto.MetricFamily
+	// Find all node_container_info metrics. It is valid (though unusual) for a
+	// node to have no containers with a readable /etc/os-release — scratch
+	// images and distroless images do not have one. Log rather than fail in
+	// that case.
+	var infoFamily *dto.MetricFamily
 	for _, mf := range mfs {
-		if mf.GetName() == "container_image_container_os_info" {
-			osInfoFamily = mf
+		if mf.GetName() == "container_image_node_container_info" {
+			infoFamily = mf
 			break
 		}
 	}
-	if osInfoFamily == nil || len(osInfoFamily.GetMetric()) == 0 {
-		t.Log("no container_image_container_os_info metrics found: all running containers may be scratch/distroless images")
+	if infoFamily == nil || len(infoFamily.GetMetric()) == 0 {
+		t.Log("no container_image_node_container_info metrics found: all running containers may be scratch/distroless images")
 		return
 	}
 
-	t.Logf("found %d container(s) with os_info metrics", len(osInfoFamily.GetMetric()))
+	t.Logf("found %d container(s) with node_container_info metrics", len(infoFamily.GetMetric()))
 
 	// Structural checks on every emitted metric.
-	for _, m := range osInfoFamily.GetMetric() {
+	for _, m := range infoFamily.GetMetric() {
 		labels := make(map[string]string, len(m.GetLabel()))
 		for _, lp := range m.GetLabel() {
 			labels[lp.GetName()] = lp.GetValue()
 		}
 
 		// These labels must always be non-empty.
-		for _, required := range []string{"container_id", "namespace", "pod", "container"} {
+		for _, required := range []string{"id", "namespace", "pod", "container"} {
 			if labels[required] == "" {
-				t.Errorf("os_info metric for container %q has empty required label %q; full labels: %v",
-					labels["container_id"], required, labels)
+				t.Errorf("node_container_info metric for container %q has empty required label %q; full labels: %v",
+					labels["id"], required, labels)
 			}
 		}
 
 		// Pause containers must never appear — they are filtered in CRIClient.
 		if labels["container"] == pauseContainerName {
-			t.Errorf("os_info metric emitted for pause container (container_id=%s)", labels["container_id"])
+			t.Errorf("node_container_info metric emitted for pause container (id=%s)", labels["id"])
 		}
 
-		// The digest label is sourced from CRI ImageRef and must be non-empty
+		// The image_id label is sourced from CRI ImageRef and must be non-empty
 		// and start with "sha256:".
-		d := labels["digest"]
+		d := labels["image_id"]
 		if d == "" {
-			t.Errorf("digest label is empty for container %s — ImageRef not populated by runtime", labels["container_id"])
+			t.Errorf("image_id label is empty for container %s — ImageRef not populated by runtime", labels["id"])
 		} else if !strings.HasPrefix(d, "sha256:") {
-			t.Errorf("digest label %q does not start with 'sha256:' for container %s", d, labels["container_id"])
+			t.Errorf("image_id label %q does not start with 'sha256:' for container %s", d, labels["id"])
 		}
 
 		// image is the user-specified reference; it should be non-empty and
@@ -120,15 +121,15 @@ func TestNode_Collect(t *testing.T) {
 		// wasn't populated by the runtime).
 		img := labels["image"]
 		if img == "" {
-			t.Errorf("container %s: image label is empty (UserSpecifiedImage not set by runtime)", labels["container_id"])
+			t.Errorf("container %s: image label is empty (UserSpecifiedImage not set by runtime)", labels["id"])
 		}
-		t.Logf("container %s (%s/%s): image=%q digest=%q",
-			labels["container_id"], labels["namespace"], labels["pod"], img, labels["digest"])
+		t.Logf("container %s (%s/%s): image=%q image_id=%q",
+			labels["id"], labels["namespace"], labels["pod"], img, labels["image_id"])
 
 		// Gauge value is always 1 for a present metric.
 		if m.GetGauge().GetValue() != 1 {
-			t.Errorf("os_info gauge = %v for container %s, want 1",
-				m.GetGauge().GetValue(), labels["container_id"])
+			t.Errorf("node_container_info gauge = %v for container %s, want 1",
+				m.GetGauge().GetValue(), labels["id"])
 		}
 	}
 }

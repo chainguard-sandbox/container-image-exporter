@@ -86,7 +86,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count by (id) (\n  container_image_container_os_info{exported_namespace=~\"$namespace\", id!=\"\"}\n)\n",
+          "expr": "count by (os_id) (\n  container_image_node_container_info{exported_namespace=~\"$namespace\", os_id!=\"\"}\n)\n",
           "format": "time_series",
           "instant": true,
           "legendFormat": "{{id}}",
@@ -163,7 +163,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count by (value) (\n    label_replace(\n      container_image_container_os_info{exported_namespace=~\"$namespace\", id=~\"chainguard|wolfi\"},\n      \"value\", \"Chainguard / Wolfi\", \"\", \"\"\n    )\n  or\n    label_replace(\n      container_image_container_os_info{exported_namespace=~\"$namespace\", id!~\"chainguard|wolfi\"},\n      \"value\", \"Non-Chainguard\", \"\", \"\"\n    )\n)\n",
+          "expr": "count by (value) (\n    label_replace(\n      container_image_node_container_info{exported_namespace=~\"$namespace\", os_id=~\"chainguard|wolfi\"},\n      \"value\", \"Chainguard / Wolfi\", \"\", \"\"\n    )\n  or\n    label_replace(\n      container_image_node_container_info{exported_namespace=~\"$namespace\", os_id!~\"chainguard|wolfi\"},\n      \"value\", \"Non-Chainguard\", \"\", \"\"\n    )\n)\n",
           "format": "time_series",
           "instant": true,
           "legendFormat": "{{value}}",
@@ -252,7 +252,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(container_image_container_os_info{exported_namespace=~\"$namespace\",id!~\"wolfi|chainguard\"}) by (exported_namespace,exported_pod,exported_container,image)",
+          "expr": "max(container_image_node_container_info{exported_namespace=~\"$namespace\",os_id!~\"wolfi|chainguard\"}) by (exported_namespace,exported_pod,exported_container,image)",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -377,7 +377,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count by (id) (container_image_container_os_info{exported_namespace=~\"$namespace\"})\n",
+          "expr": "count by (os_id) (container_image_node_container_info{exported_namespace=~\"$namespace\"})\n",
           "format": "time_series",
           "legendFormat": "{{id}}",
           "range": true,
@@ -484,7 +484,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "100 * count(\n  container_image_container_os_info{exported_namespace=~\"$namespace\", id=~\"chainguard|wolfi\"}\n) by (exported_namespace)\n/ count(\n  container_image_container_os_info{exported_namespace=~\"$namespace\"}\n) by (exported_namespace)\n",
+          "expr": "100 * count(\n  container_image_node_container_info{exported_namespace=~\"$namespace\", os_id=~\"chainguard|wolfi\"}\n) by (exported_namespace)\n/ count(\n  container_image_node_container_info{exported_namespace=~\"$namespace\"}\n) by (exported_namespace)\n",
           "format": "time_series",
           "legendFormat": "{{exported_namespace}}",
           "range": true,
@@ -514,7 +514,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(container_image_container_os_info,exported_namespace)",
+        "definition": "label_values(container_image_node_container_info,exported_namespace)",
         "description": "Kubernetes namespace(s) to filter by.",
         "includeAll": true,
         "multi": true,
@@ -522,7 +522,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(container_image_container_os_info,exported_namespace)",
+          "query": "label_values(container_image_node_container_info,exported_namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
