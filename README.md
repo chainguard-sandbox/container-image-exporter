@@ -218,7 +218,7 @@ prometheus.io/path: "/metrics"
 
 | Metric                               | Description                                                                                       | Labels                                                                                   |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| container_image_container_os_info    | OS release information sourced from inside each running container.              | container_id, namespace, pod, container, image, digest, build_id, id, id_like, image_id, image_version, name, pretty_name, variant, variant_id, version, version_codename, version_id |
+| container_image_node_container_info  | Per-running-container info: identity (pod, namespace, image, image_id) and OS release fields read from /etc/os-release inside the container's rootfs. | id, namespace, pod, container, image, image_id, os_build_id, os_id, os_id_like, os_image_id, os_image_version, os_name, os_pretty_name, os_variant, os_variant_id, os_version, os_version_codename, os_version_id |
 | container_image_node_exporter_up     | 1 if the last collection completed successfully, 0 otherwise.                                     | —                                                                                        |
 
 ## Supported Resources
@@ -461,11 +461,11 @@ they build an image.
 
 ### OS Distribution Breakdown Across Running Containers
 
-Using the node exporter's `container_image_container_os_info` metric, you can
+Using the node exporter's `container_image_node_container_info` metric, you can
 see which OS distributions are actually running across the cluster:
 
 ```
-count by (id) (container_image_container_os_info)
+count by (os_id) (container_image_node_container_info)
 ```
 
 This groups running containers by their `ID` from `/etc/os-release` (e.g.

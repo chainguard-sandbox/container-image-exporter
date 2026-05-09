@@ -20,12 +20,12 @@ const metricNamespace = "container_image"
 var errNoOSRelease = errors.New("no os-release file under container root")
 
 var (
-	metricContainerOSInfo = prometheus.NewDesc(
-		prometheus.BuildFQName(metricNamespace, "container", "os_info"),
-		"OS release information sourced from /etc/os-release inside each running container.",
-		[]string{"container_id", "namespace", "pod", "container", "image", "digest",
-			"build_id", "id", "id_like", "image_id", "image_version", "name", "pretty_name",
-			"variant", "variant_id", "version", "version_codename", "version_id"}, nil,
+	metricNodeContainerInfo = prometheus.NewDesc(
+		prometheus.BuildFQName(metricNamespace, "node_container", "info"),
+		"Per-running-container info from the local node, including identity (pod, namespace, image, image_id) and OS release fields read from /etc/os-release inside the container's rootfs.",
+		[]string{"id", "namespace", "pod", "container", "image", "image_id",
+			"os_build_id", "os_id", "os_id_like", "os_image_id", "os_image_version", "os_name", "os_pretty_name",
+			"os_variant", "os_variant_id", "os_version", "os_version_codename", "os_version_id"}, nil,
 	)
 	metricUp = prometheus.NewDesc(
 		prometheus.BuildFQName(metricNamespace, "node_exporter", "up"),
@@ -37,7 +37,7 @@ var (
 // Exporter implements prometheus.Collector. On each Prometheus scrape it:
 //  1. Lists all running containers on this node via the CRI socket.
 //  2. Reads /etc/os-release from each container's rootfs via /proc/{pid}/root.
-//  3. Emits container_image_container_os_info metrics.
+//  3. Emits container_image_node_container_info metrics.
 type Exporter struct {
 	cri      *CRIClient
 	procRoot string
@@ -55,7 +55,7 @@ func NewExporter(conn *grpc.ClientConn, procRoot string) *Exporter {
 
 // Describe implements prometheus.Collector.
 func (c *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	ch <- metricContainerOSInfo
+	ch <- metricNodeContainerInfo
 	ch <- metricUp
 }
 
@@ -92,7 +92,7 @@ func (c *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			metricContainerOSInfo, prometheus.GaugeValue, 1,
+			metricNodeContainerInfo, prometheus.GaugeValue, 1,
 			container.ID,
 			container.PodNamespace,
 			container.PodName,

@@ -121,6 +121,6 @@ wait_for_query "node-exporter up" 'container_image_node_exporter_up'
 wait_for_query "exporter observed its own pod image" \
     "container_image_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\"}"
 wait_for_query "node-exporter resolved wolfi os-release from /proc/<pid>/root" \
-    "container_image_container_os_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\",id=\"wolfi\"}"
+    "container_image_node_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\",os_id=\"wolfi\"}"
 
 echo "==> All metrics verified"

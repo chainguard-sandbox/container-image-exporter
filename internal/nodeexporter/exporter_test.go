@@ -78,7 +78,6 @@ func TestReadOSRelease_SymlinkEscape(t *testing.T) {
 	// Also verify the secret content was not read.
 }
 
-
 // TestExporter_Collect_HappyPath verifies that a running container with a
 // readable /etc/os-release produces a correctly-labelled os_info metric and
 // that the up metric is 1.
@@ -114,20 +113,20 @@ func TestExporter_Collect_HappyPath(t *testing.T) {
 		t.Fatalf("Gather: %v", err)
 	}
 
-	m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-		"container_id": containerID,
-		"namespace":    "default",
-		"pod":          "my-pod",
-		"container":    "app",
-		"image":        "registry.example.com/app:latest",
-		"digest":       "sha256:aaaa",
-		"id":           "wolfi",
-		"name":         "Wolfi",
-		"pretty_name":  "Wolfi",
-		"version_id":   "20240101",
+	m := findGatheredMetric(mfs, "container_image_node_container_info", map[string]string{
+		"id":             containerID,
+		"namespace":      "default",
+		"pod":            "my-pod",
+		"container":      "app",
+		"image":          "registry.example.com/app:latest",
+		"image_id":       "sha256:aaaa",
+		"os_id":          "wolfi",
+		"os_name":        "Wolfi",
+		"os_pretty_name": "Wolfi",
+		"os_version_id":  "20240101",
 	})
 	if m == nil {
-		t.Error("container_image_container_os_info not found with expected labels")
+		t.Error("container_image_node_container_info not found with expected labels")
 	}
 
 	up := findGatheredMetric(mfs, "container_image_node_exporter_up", nil)
@@ -180,12 +179,12 @@ func TestExporter_Collect_UsrLibFallback(t *testing.T) {
 		t.Fatalf("Gather: %v", err)
 	}
 
-	if m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-		"container_id": containerID,
-		"id":           "debian",
-		"name":         "Debian GNU/Linux",
+	if m := findGatheredMetric(mfs, "container_image_node_container_info", map[string]string{
+		"id":      containerID,
+		"os_id":   "debian",
+		"os_name": "Debian GNU/Linux",
 	}); m == nil {
-		t.Error("container_image_container_os_info not found with expected labels from usr/lib/os-release")
+		t.Error("container_image_node_container_info not found with expected labels from usr/lib/os-release")
 	}
 }
 
@@ -227,13 +226,13 @@ func TestExporter_Collect_DistrolessEmitsEmptyLabels(t *testing.T) {
 	}
 
 	// Metric must be emitted with empty os-release labels.
-	m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-		"container_id": "ctr-distroless",
-		"id":           "",
-		"name":         "",
+	m := findGatheredMetric(mfs, "container_image_node_container_info", map[string]string{
+		"id":      "ctr-distroless",
+		"os_id":   "",
+		"os_name": "",
 	})
 	if m == nil {
-		t.Error("container_image_container_os_info not emitted for distroless container")
+		t.Error("container_image_node_container_info not emitted for distroless container")
 	}
 
 	up := findGatheredMetric(mfs, "container_image_node_exporter_up", nil)
@@ -277,10 +276,10 @@ func TestExporter_Collect_SkipsContainerOnReadError(t *testing.T) {
 		t.Fatalf("Gather: %v", err)
 	}
 
-	if m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-		"container_id": "ctr-gone",
+	if m := findGatheredMetric(mfs, "container_image_node_container_info", map[string]string{
+		"id": "ctr-gone",
 	}); m != nil {
-		t.Error("container_image_container_os_info unexpectedly emitted for container with missing root")
+		t.Error("container_image_node_container_info unexpectedly emitted for container with missing root")
 	}
 
 	up := findGatheredMetric(mfs, "container_image_node_exporter_up", nil)
@@ -334,27 +333,27 @@ func TestExporter_Collect_MultipleContainers(t *testing.T) {
 		{"ctr-1", "wolfi"},
 		{"ctr-2", "ubuntu"},
 	} {
-		if m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-			"container_id": tc.containerID,
-			"id":           tc.wantID,
+		if m := findGatheredMetric(mfs, "container_image_node_container_info", map[string]string{
+			"id":    tc.containerID,
+			"os_id": tc.wantID,
 		}); m == nil {
-			t.Errorf("container_image_container_os_info not found for container %s with id=%s", tc.containerID, tc.wantID)
+			t.Errorf("container_image_node_container_info not found for container %s with os_id=%s", tc.containerID, tc.wantID)
 		}
 	}
 
 	// ctr-3 (scratch) must produce no metric.
-	if m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-		"container_id": "ctr-3",
+	if m := findGatheredMetric(mfs, "container_image_node_container_info", map[string]string{
+		"id": "ctr-3",
 	}); m != nil {
-		t.Error("container_image_container_os_info unexpectedly emitted for scratch ctr-3")
+		t.Error("container_image_node_container_info unexpectedly emitted for scratch ctr-3")
 	}
 }
 
-// TestExporter_Collect_DigestFromImageRef verifies that the digest label is
+// TestExporter_Collect_ImageIDFromImageRef verifies that the image_id label is
 // sourced from the CRI Container.ImageRef field, not parsed out of Image.Image.
-func TestExporter_Collect_DigestFromImageRef(t *testing.T) {
+func TestExporter_Collect_ImageIDFromImageRef(t *testing.T) {
 	procRoot := t.TempDir()
-	containerID := "ctr-digest"
+	containerID := "ctr-image-id"
 	const pid = 1200
 	makeRootfs(t, procRoot, pid, "ID=alpine\n")
 
@@ -382,12 +381,12 @@ func TestExporter_Collect_DigestFromImageRef(t *testing.T) {
 		t.Fatalf("Gather: %v", err)
 	}
 
-	m := findGatheredMetric(mfs, "container_image_container_os_info", map[string]string{
-		"container_id": containerID,
-		"image":        "registry.example.com/app:v2",
-		"digest":       "registry.example.com/app@sha256:deadbeef",
+	m := findGatheredMetric(mfs, "container_image_node_container_info", map[string]string{
+		"id":       containerID,
+		"image":    "registry.example.com/app:v2",
+		"image_id": "registry.example.com/app@sha256:deadbeef",
 	})
 	if m == nil {
-		t.Error("expected digest label to equal ImageRef verbatim")
+		t.Error("expected image_id label to equal ImageRef verbatim")
 	}
 }
