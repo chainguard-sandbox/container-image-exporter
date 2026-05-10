@@ -36,7 +36,10 @@ exporter:
     #     verbs: ["get", "list", "watch"]
     extraRules: []
 
-  k8sKeychain: true
+  # When true, the exporter uses the pull secrets configured for the target
+  # resource as registry credentials. Requires cluster-wide access to Secrets
+  # and ServiceAccounts.
+  k8sKeychain: false
   platform: linux/amd64
   cacheDuration: 1h
   registryConcurrency: 10
@@ -44,6 +47,13 @@ exporter:
   namespaces: []
   annotationAllowlist: []
   labelAllowlist: []
+
+  # Names of Secrets in the release namespace to use as registry
+  # credentials.
+  #
+  # imagePullSecrets:
+  #   - my-private-registry
+  imagePullSecrets: []
 
   podAnnotations: {}
   podLabels: {}

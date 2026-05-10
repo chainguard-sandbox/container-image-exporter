@@ -125,6 +125,9 @@ Both components are enabled by default. To deploy only one of them:
 --set exporter.enabled=false
 ```
 
+See [Credentials](#credentials) for instructions on how to configure registry
+credentials for the exporter component.
+
 If you are using the Prometheus Operator, enable the ServiceMonitors:
 
 ```
@@ -303,20 +306,45 @@ container-image-exporter node-exporter [flags]
 
 #### Credentials
 
-The exporter attempts to fetch registry credentials from any pull secrets
-configured for the target resources, in the same way that the kubelet would
-when running a pod. If you don't want to grant the exporter permissions to
-read secrets across the cluster, you can disable this behaviour with
-`--k8s-keychain=false` and remove the references to secrets and service
-accounts from the ClusterRole.
+The exporter requires registry credentials to fetch metadata from privately
+hosted images.
 
-Additionally, it will use any available cloud-specific credentials configured
-for the exporter pod when interacting with Google Container Registry, Google
-Artifact Registry, AWS ECR, or Azure Container Registry.
+##### Ambient Credentials 
 
-You can also modify the contents of the
-`container-image-exporter-docker-config` secret to add static credentials for
-other registries.
+The exporter automatically loads credentials from the environment. That includes
+ambient cloud provider credentials (AWS, GCP, Azure) as well as credentials
+configured locally in `~/.docker/config.json`.
+
+##### Pull Secrets
+
+Create pull secrets in the exporter's namespace (default:
+`container-image-exporter`) and provide them to the exporter with the
+`--image-pull-secret` flag. The exporter looks the named Secrets up in the
+namespace given by `--install-namespace` (set automatically to the release
+namespace by the Helm chart).
+
+```
+--image-pull-secret=my-registry --image-pull-secret=other-registry
+```
+
+If deploying with the Helm chart:
+
+```
+--set 'exporter.imagePullSecrets[0]=my-registry' \
+--set 'exporter.imagePullSecrets[1]=other-registry'
+```
+
+##### Cluster Wide Pull Secrets 
+
+Disabled by default. When `--k8s-keychain=true`, the exporter will fetch credentials
+from the pull secrets configured for the target resources in the same way the
+kubelet does. Requires cluster-wide access to Secrets and ServiceAccounts.
+
+If deploying with the Helm chart:
+
+```
+--set exporter.k8sKeychain=true
+```
 
 #### Cache Duration
 

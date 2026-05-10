@@ -89,13 +89,19 @@ tests:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.port
           value: health
 
-  - it: k8sKeychain=false renders the disabling flag
-    set:
-      exporter.k8sKeychain: false
+  - it: k8sKeychain defaults to false
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
           content: --k8s-keychain=false
+
+  - it: k8sKeychain=true renders the opt-in flag
+    set:
+      exporter.k8sKeychain: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --k8s-keychain=true
 
   - it: namespaces allowlist becomes repeated flags
     set:
@@ -109,6 +115,27 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: --namespaces=kube-system
+
+  - it: imagePullSecrets become repeated --image-pull-secret flags
+    set:
+      exporter.imagePullSecrets:
+        - my-registry
+        - other-registry
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --image-pull-secret=my-registry
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --image-pull-secret=other-registry
+
+  - it: --install-namespace defaults to the release namespace
+    release:
+      namespace: my-install-ns
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --install-namespace=my-install-ns
 
   - it: imagePullSecrets propagate
     set:

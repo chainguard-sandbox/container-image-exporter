@@ -49,6 +49,9 @@ spec:
             - --cache-duration={{ .Values.exporter.cacheDuration }}
             - --registry-concurrency={{ .Values.exporter.registryConcurrency }}
             - --registry-rps={{ .Values.exporter.registryRps }}
+            # Always set so --image-pull-secret can look up Secrets in the
+            # release namespace. Harmless when --image-pull-secret is unset.
+            - --install-namespace={{ .Release.Namespace }}
             {{- range .Values.exporter.namespaces }}
             - --namespaces={{ . }}
             {{- end }}
@@ -57,6 +60,9 @@ spec:
             {{- end }}
             {{- range .Values.exporter.labelAllowlist }}
             - --label-allowlist={{ . }}
+            {{- end }}
+            {{- range .Values.exporter.imagePullSecrets }}
+            - --image-pull-secret={{ . }}
             {{- end }}
           ports:
             - name: metrics

@@ -11,15 +11,17 @@ import (
 type Option func(*options)
 
 type options struct {
-	k8sKeychain          bool
-	cacheDuration        time.Duration
-	platform             *v1.Platform
-	registryConcurrency  int
-	registryRPS          float64
-	registryTimeout      time.Duration
-	metricsRegistry      prometheus.Registerer
-	annotationAllowlist  []string
-	labelAllowlist       []string
+	k8sKeychain         bool
+	cacheDuration       time.Duration
+	platform            *v1.Platform
+	registryConcurrency int
+	registryRPS         float64
+	registryTimeout     time.Duration
+	metricsRegistry     prometheus.Registerer
+	annotationAllowlist []string
+	labelAllowlist      []string
+	installNamespace    string
+	imagePullSecrets    []string
 }
 
 // WithCacheDuration is a functional option that configures the amount of time
@@ -97,5 +99,21 @@ func WithAnnotationAllowlist(keys []string) Option {
 func WithLabelAllowlist(keys []string) Option {
 	return func(o *options) {
 		o.labelAllowlist = keys
+	}
+}
+
+// WithInstallNamespace describes the namespace the exporter is installed
+// in. Used to lookup pull secrets specified by WithImagePullSecrets.
+func WithInstallNamespace(namespace string) Option {
+	return func(o *options) {
+		o.installNamespace = namespace
+	}
+}
+
+// WithImagePullSecrets configures a list of Secret names in the install
+// namespace to use as registry credentials.
+func WithImagePullSecrets(names []string) Option {
+	return func(o *options) {
+		o.imagePullSecrets = names
 	}
 }

@@ -59,6 +59,7 @@ type ContainerImageReconciler struct {
 	CacheDuration           time.Duration
 	Platform                *v1.Platform
 	K8sKeychain             bool
+	StaticKeychain          authn.Keychain
 	Transport               http.RoundTripper
 	Inflight                *singleflight.Group
 	RegistryTimeout         time.Duration
@@ -247,6 +248,13 @@ func (r *ContainerImageReconciler) newKeychain(ctx context.Context, obj *unstruc
 			return nil, fmt.Errorf("constructing k8s keychain: %w", err)
 		}
 		keychains = append([]authn.Keychain{k8s}, keychains...)
+	}
+
+	// Prepend the static, install-namespace-scoped keychain (built once at
+	// startup from --image-pull-secret) so operator-provided credentials win
+	// ahead of per-workload and ambient cloud creds.
+	if r.StaticKeychain != nil {
+		keychains = append([]authn.Keychain{r.StaticKeychain}, keychains...)
 	}
 
 	return authn.NewMultiKeychain(keychains...), nil

@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/prometheus/client_golang/prometheus"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -20,8 +21,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // AddToScheme registers all types required by the controller with s.
@@ -396,6 +399,42 @@ func SetupControllers(mgr ctrl.Manager, opts ...Option) error {
 		transport = newRegistryTransport(nil, int64(o.registryConcurrency), o.registryRPS)
 	}
 
+	// If --image-pull-secret was provided, register a Secret reconciler with
+	// the manager that rebuilds a shared keychain whenever any of the named
+	// Secrets changes. Reuses the manager's cache (scoped to the install
+	// namespace via cache.ByObject in cmd) and workqueue, so rotations
+	// propagate without a pod restart and bursts of events get coalesced.
+	var staticKeychain authn.Keychain
+	if len(o.imagePullSecrets) > 0 {
+		if o.installNamespace == "" {
+			return fmt.Errorf("WithImagePullSecrets requires WithInstallNamespace")
+		}
+		pk := newPullSecretKeychain()
+		nameSet := make(map[string]struct{}, len(o.imagePullSecrets))
+		for _, n := range o.imagePullSecrets {
+			nameSet[n] = struct{}{}
+		}
+		pred := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			if obj.GetNamespace() != o.installNamespace {
+				return false
+			}
+			_, ok := nameSet[obj.GetName()]
+			return ok
+		})
+		if err := ctrl.NewControllerManagedBy(mgr).
+			Named("pull-secret-keychain").
+			For(&corev1.Secret{}, builder.WithPredicates(pred)).
+			Complete(&pullSecretReconciler{
+				Client:    mgr.GetClient(),
+				namespace: o.installNamespace,
+				names:     o.imagePullSecrets,
+				keychain:  pk,
+			}); err != nil {
+			return fmt.Errorf("registering pull-secret reconciler: %w", err)
+		}
+		staticKeychain = pk
+	}
+
 	for _, r := range allResources {
 		reconciler := &ContainerImageReconciler{
 			Client:                  mgr.GetClient(),
@@ -408,6 +447,7 @@ func SetupControllers(mgr ctrl.Manager, opts ...Option) error {
 			CacheDuration:           o.cacheDuration,
 			Platform:                o.platform,
 			K8sKeychain:             o.k8sKeychain,
+			StaticKeychain:          staticKeychain,
 			Transport:               transport,
 			Inflight:                inflight,
 			RegistryTimeout:         o.registryTimeout,

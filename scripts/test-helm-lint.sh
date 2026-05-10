@@ -28,5 +28,8 @@ render "RBAC disabled" --set exporter.rbac.create=false
 render "service accounts not created" \
     --set exporter.serviceAccount.create=false \
     --set nodeExporter.serviceAccount.create=false
+render "imagePullSecrets configured" \
+    --set 'exporter.imagePullSecrets[0]=my-registry' \
+    --set 'exporter.imagePullSecrets[1]=other-registry'
 
 echo "==> All lint checks passed"
