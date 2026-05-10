@@ -26,8 +26,7 @@ HELM_TEST_NAMESPACE  ?= container-image-exporter
 HELM_MONITORING_NS   ?= monitoring
 
 DEMO_CLUSTER    ?= cie-demo
-DEMO_IMAGE_NAME ?= container-image-exporter
-DEMO_IMAGE_TAG  ?= demo
+DEMO_IMAGE_TAG  ?= 24h
 DEMO_NAMESPACE  ?= container-image-exporter
 
 ifeq ($(shell uname -s),Darwin)
@@ -86,7 +85,6 @@ demo: $(K3D)
 	K3D=$(K3D) \
 	ORG=$(ORG) \
 	DEMO_CLUSTER=$(DEMO_CLUSTER) \
-	DEMO_IMAGE_NAME=$(DEMO_IMAGE_NAME) \
 	DEMO_IMAGE_TAG=$(DEMO_IMAGE_TAG) \
 	DEMO_NAMESPACE=$(DEMO_NAMESPACE) \
 	HELM_MONITORING_NS=$(HELM_MONITORING_NS) \

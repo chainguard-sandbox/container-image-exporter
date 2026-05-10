@@ -4,10 +4,15 @@ set -euo pipefail
 K3D="${K3D:-k3d}"
 ORG="${ORG:-}"
 DEMO_CLUSTER="${DEMO_CLUSTER:-cie-demo}"
-DEMO_IMAGE_NAME="${DEMO_IMAGE_NAME:-container-image-exporter}"
-DEMO_IMAGE_TAG="${DEMO_IMAGE_TAG:-demo}"
 DEMO_NAMESPACE="${DEMO_NAMESPACE:-container-image-exporter}"
 HELM_MONITORING_NS="${HELM_MONITORING_NS:-monitoring}"
+
+# ttl.sh is an anonymous, public registry where image names must be unique
+# per push and the tag is the TTL. The image is auto-deleted when the TTL
+# expires (here: 24h), so a per-run UUID is fine.
+DEMO_IMAGE_REPO="${DEMO_IMAGE_REPO:-ttl.sh/container-image-exporter-$(uuidgen | tr 'A-Z' 'a-z')}"
+DEMO_IMAGE_TAG="${DEMO_IMAGE_TAG:-24h}"
+DEMO_IMAGE_REF="${DEMO_IMAGE_REPO}:${DEMO_IMAGE_TAG}"
 
 if [[ -z "${ORG}" ]]; then
     echo "error: ORG env var is required (your cgr.dev org slug, e.g. 'my-org.com')" >&2
@@ -52,9 +57,8 @@ until kubectl get serviceaccount default -n default >/dev/null 2>&1; do sleep 1;
 # Image
 # ---------------------------------------------------------------------------
 
-echo "==> Building and importing image"
-docker build -t "${DEMO_IMAGE_NAME}:${DEMO_IMAGE_TAG}" .
-"${K3D}" image import "${DEMO_IMAGE_NAME}:${DEMO_IMAGE_TAG}" -c "${DEMO_CLUSTER}"
+echo "==> Building and pushing image to ${DEMO_IMAGE_REF}"
+docker build --push -t "${DEMO_IMAGE_REF}" .
 
 # ---------------------------------------------------------------------------
 # cert-manager
@@ -101,9 +105,8 @@ kubectl create secret docker-registry cgr-docker-config \
 echo "==> Installing container-image-exporter chart"
 helm install container-image-exporter ./deploy/chart \
     --namespace "${DEMO_NAMESPACE}" --create-namespace \
-    --set image.repository="${DEMO_IMAGE_NAME}" \
+    --set image.repository="${DEMO_IMAGE_REPO}" \
     --set image.tag="${DEMO_IMAGE_TAG}" \
-    --set image.pullPolicy=Never \
     --set exporter.serviceMonitor.enabled=true \
     --set nodeExporter.serviceMonitor.enabled=true \
     --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock \
