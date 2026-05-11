@@ -131,3 +131,50 @@ tests:
       - equal:
           path: spec.selector.matchLabels["app.kubernetes.io/component"]
           value: exporter
+
+  - it: always mounts an emptyDir at /home/nonroot/.ecr for the AWS credential helper
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: ecr-cache
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: ecr-cache
+            mountPath: /home/nonroot/.ecr
+
+  - it: user-provided volumes and volumeMounts compose with the default ecr-cache
+    set:
+      exporter.volumes:
+        - name: docker-config
+          secret:
+            secretName: my-docker-config
+      exporter.volumeMounts:
+        - name: docker-config
+          mountPath: /home/nonroot/.docker
+          readOnly: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: ecr-cache
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: docker-config
+            secret:
+              secretName: my-docker-config
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: ecr-cache
+            mountPath: /home/nonroot/.ecr
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: docker-config
+            mountPath: /home/nonroot/.docker
+            readOnly: true
