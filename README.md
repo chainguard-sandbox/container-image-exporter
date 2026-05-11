@@ -405,16 +405,23 @@ Unless they are specifically overwritten, Docker will persist the labels from
 the base image in the images it builds. This means you can use those labels to
 infer various things about the images defined in your clusters.
 
-For instance, you could use the presence of the `dev.chainguard.package.main`
-label to calculate the percentage of containers defined in the cluster that are
+For instance, you can use the presence of any of `dev.chainguard.image.title`,
+`dev.chainguard.package.main`, or `org.opencontainers.image.vendor="Chainguard"`
+to calculate the percentage of containers defined in the cluster that are
 using Chainguard images or images based on Chainguard.
 
 ```
   (
       count(
         container_image_container_info{kind!="Pod"}
-        * on (digest) group_left (value)
-          container_image_label{key="dev.chainguard.package.main"}
+        * on (digest) group_left
+          count by (digest) (
+              container_image_label{key="dev.chainguard.image.title"}
+            or
+              container_image_label{key="dev.chainguard.package.main"}
+            or
+              container_image_label{key="org.opencontainers.image.vendor", value="Chainguard"}
+          )
       )
     /
       count(
@@ -432,6 +439,7 @@ This is typically a better way to measure the number of 'applications that
 still need to be migrated to Chainguard' than looking at the running
 containers, which can be skewed by, for instance, Deployments or Daemonsets
 that run 100s of pods versus a StatefulSet that runs a handful.
+
 
 ### Images Older Than X Number of Days
 
