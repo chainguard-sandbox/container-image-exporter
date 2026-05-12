@@ -479,3 +479,29 @@ count by (os_id) (container_image_node_container_info)
 This groups running containers by their `ID` from `/etc/os-release` (e.g.
 `alpine`, `debian`, `wolfi`, `chainguard`), giving a real-time view of OS
 distribution across nodes.
+
+## Demo
+
+The `make demo` target creates a self-contained cluster that demonstrates the
+exporters running. 
+
+### Prerequisites
+
+- [Helm](https://helm.sh)
+- [Docker](https://docs.docker.com/get-docker/)
+- [chainctl](https://edu.chainguard.dev/chainguard/administration/how-to-install-chainctl/) — logged in to your Chainguard organisation
+- These Helm charts in your Chainguard organization:
+  - `cert-manager` (`oci://cgr.dev/<org>/charts/cert-manager`)
+  - `kube-prometheus-stack` (`oci://cgr.dev/<org>/charts/kube-prometheus-stack`)
+
+### Running
+
+```
+make demo ORG=<org-name>
+```
+
+Once deployed, the script prints port-forward commands and credentials for
+Prometheus and Grafana. Open the Grafana dashboards to see the
+container-image-exporter metrics visualised in real time.
+
+To stop the demo and clean up the cluster, press Ctrl+C.
