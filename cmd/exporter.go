@@ -11,10 +11,12 @@ import (
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -38,9 +40,11 @@ var (
 	registryConcurrency int
 	registryRPS         float64
 	registryTimeout     time.Duration
+	installNamespace    string
 	namespaces          []string
 	annotationAllowlist []string
 	labelAllowlist      []string
+	imagePullSecrets    []string
 )
 
 var exporterCmd = &cobra.Command{
@@ -61,13 +65,25 @@ var exporterCmd = &cobra.Command{
 			cacheOpts.DefaultNamespaces = nsMap
 		}
 
+		if len(imagePullSecrets) > 0 {
+			if installNamespace == "" {
+				return errors.New("--image-pull-secret requires --install-namespace to be set to the namespace the named Secrets live in")
+			}
+			if cacheOpts.ByObject == nil {
+				cacheOpts.ByObject = map[client.Object]cache.ByObject{}
+			}
+			cacheOpts.ByObject[&corev1.Secret{}] = cache.ByObject{
+				Namespaces: map[string]cache.Config{installNamespace: {}},
+			}
+		}
+
 		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 			Scheme: scheme,
 			Metrics: metricsserver.Options{
 				BindAddress: metricsAddr,
 			},
 			HealthProbeBindAddress: probeAddr,
-			Cache:                 cacheOpts,
+			Cache:                  cacheOpts,
 		})
 		if err != nil {
 			return fmt.Errorf("creating a new manager: %w", err)
@@ -91,6 +107,8 @@ var exporterCmd = &cobra.Command{
 			exporter.WithRegistryTimeout(registryTimeout),
 			exporter.WithAnnotationAllowlist(annotationAllowlist),
 			exporter.WithLabelAllowlist(labelAllowlist),
+			exporter.WithInstallNamespace(installNamespace),
+			exporter.WithImagePullSecrets(imagePullSecrets),
 		); err != nil {
 			return fmt.Errorf("setting up controllers: %w", err)
 		}
@@ -127,11 +145,13 @@ func init() {
 	exporterCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	exporterCmd.Flags().StringVar(&platform, "platform", "", "The default platform to resolve multi-arch images to. Defaults to the platform the exporter is running on.")
 	exporterCmd.Flags().DurationVar(&cacheDuration, "cache-duration", 1*time.Hour, "How long to cache image details for before querying the registry again.")
-	exporterCmd.Flags().BoolVar(&k8sKeychain, "k8s-keychain", true, "Whether to fetch credentials from pulls secrets in the cluster.")
+	exporterCmd.Flags().BoolVar(&k8sKeychain, "k8s-keychain", false, "Whether to fetch credentials from pulls secrets in the cluster.")
 	exporterCmd.Flags().IntVar(&registryConcurrency, "registry-concurrency", 10, "Maximum number of concurrent requests per registry. Set to 0 to disable.")
 	exporterCmd.Flags().Float64Var(&registryRPS, "registry-rps", 5, "Maximum requests per second per registry. Set to 0 to disable.")
 	exporterCmd.Flags().DurationVar(&registryTimeout, "registry-timeout", 30*time.Second, "Per-image timeout for registry requests. Set to 0 to disable.")
+	exporterCmd.Flags().StringVar(&installNamespace, "install-namespace", "", "Namespace the exporter is installed in. Used to look up the Secrets named via --image-pull-secret. The Helm chart sets this automatically to the release namespace.")
 	exporterCmd.Flags().StringArrayVar(&namespaces, "namespaces", nil, "Namespaces to watch (can be specified multiple times). Watches all namespaces if not set.")
 	exporterCmd.Flags().StringArrayVar(&annotationAllowlist, "annotation-allowlist", nil, "Annotation keys to include in container_image_annotation metrics (can be specified multiple times). Emits all annotations if not set.")
 	exporterCmd.Flags().StringArrayVar(&labelAllowlist, "label-allowlist", nil, "Label keys to include in container_image_label metrics (can be specified multiple times). Emits all labels if not set.")
+	exporterCmd.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Pull secrets to use as registry credentials. Must be provided with --install-namespace, which specifies the namespace the secrets are installed in.")
 }

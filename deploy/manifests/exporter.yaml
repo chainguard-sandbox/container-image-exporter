@@ -32,15 +32,19 @@ rules:
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["secrets", "serviceaccounts"]
-  verbs: ["get", "list"]
 - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "daemonsets"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["batch"]
   resources: ["jobs", "cronjobs"]
   verbs: ["get", "list", "watch"]
+# Opt-in: required only if you start the exporter with --k8s-keychain (off
+# by default) so it can follow each workload's spec.imagePullSecrets and
+# spec.serviceAccountName. Prefer the namespaced --image-pull-secret flag
+# instead — see the README's "Credentials" section.
+# - apiGroups: [""]
+#   resources: ["secrets", "serviceaccounts"]
+#   verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

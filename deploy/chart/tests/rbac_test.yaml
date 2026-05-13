@@ -22,8 +22,20 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: k8sKeychain=true includes the secrets/serviceaccounts rule
+  - it: default ClusterRole does NOT include the secrets/serviceaccounts rule
     template: templates/exporter/clusterrole.yaml
+    asserts:
+      - notContains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets", "serviceaccounts"]
+            verbs: ["get", "list"]
+
+  - it: k8sKeychain=true opts into the secrets/serviceaccounts rule
+    template: templates/exporter/clusterrole.yaml
+    set:
+      exporter.k8sKeychain: true
     asserts:
       - contains:
           path: rules
@@ -94,3 +106,55 @@ tests:
             name: cie-container-image-exporter
             namespace: NAMESPACE
         template: templates/exporter/clusterrolebinding.yaml
+
+  - it: imagePullSecrets Role+RoleBinding are not rendered by default
+    template: templates/exporter/role.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: imagePullSecrets renders a namespace-scoped Role for Secret list/watch
+    template: templates/exporter/role.yaml
+    set:
+      exporter.imagePullSecrets:
+        - my-registry
+        - other-registry
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: Role
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets"]
+            verbs: ["get", "list", "watch"]
+
+  - it: imagePullSecrets renders a RoleBinding pointing at the exporter SA
+    template: templates/exporter/role.yaml
+    set:
+      exporter.imagePullSecrets:
+        - my-registry
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: RoleBinding
+      - equal:
+          path: roleRef.name
+          value: cie-container-image-exporter-image-pull-secrets
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: cie-container-image-exporter
+            namespace: NAMESPACE
+
+  - it: imagePullSecrets Role is omitted when rbac.create=false
+    template: templates/exporter/role.yaml
+    set:
+      exporter.imagePullSecrets:
+        - my-registry
+      exporter.rbac.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
