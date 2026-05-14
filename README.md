@@ -154,14 +154,16 @@ prometheus.io/path: "/metrics"
 
 ### Exporter
 
-| Metric                          | Description                                                                                            | Labels                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| container_image_container_info  | Details about containers running in the cluster, including the image digest resolved by the exporter.  | group, version, kind, namespace, name, jsonpath, image, digest |
-| container_image_annotation      | Annotations from the image manifest.                                                                   | digest, key, value                                             |
-| container_image_label           | Labels from the image config.                                                                          | digest, key, value                                             |
-| container_image_size_bytes      | The size of the image in the registry.                                                                 | digest                                                         |
-| container_image_created         | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
-| container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
+| Metric                                       | Description                                                                                            | Labels                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| container_image_container_info               | Info about containers running in the cluster, including the image digest resolved by the exporter.    | group, version, kind, namespace, name, jsonpath, image, digest |
+| container_image_annotation                   | Annotations from the image manifest.                                                                   | digest, key, value                                             |
+| container_image_label                        | Labels from the image config.                                                                          | digest, key, value                                             |
+| container_image_size_bytes                   | The size of the image in the registry.                                                                 | digest                                                         |
+| container_image_created                      | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
+| container_image_cache_oldest_entry_timestamp | Unix timestamp of the oldest entry in the image cache. Combine with `container_image_cache_duration_seconds` to alert on stuck reconcilers. | —                                                              |
+| container_image_cache_duration_seconds       | Configured cache duration in seconds.                                                                  | —                                                              |
+| container_image_up                           | 1 if the last metrics collection completed successfully (all resource types listed), 0 otherwise.      | —                                                              |
 
 ### Node Exporter
 
@@ -170,7 +172,7 @@ prometheus.io/path: "/metrics"
 | container_image_node_container_info  | Information about running containers from the local CRI runtime, plus OS release details from `/etc/os-release`. | id, namespace, pod, container, image, image_id, os_build_id, os_id, os_id_like, os_image_id, os_image_version, os_name, os_pretty_name, os_variant, os_variant_id, os_version, os_version_codename, os_version_id |
 | container_image_node_image_labels    | Labels from the image config.                                                                                    | image_id, key, value                                                                                                                                                                                              |
 | container_image_node_image_created   | The created date from the image config. Expressed as a Unix Epoch Time.                                          | image_id                                                                                                                                                                                                          |
-| container_image_node_exporter_up     | 1 if the last collection completed successfully, 0 otherwise.                                                    | —                                                                                                                                                                                                                 |
+| container_image_node_exporter_up     | 1 if the collection completed successfully, 0 otherwise.                                                         | —                                                                                                                                                                                                                 |
 
 By default the `container_image_node_image_*` metrics only cover images
 backing a running container. Install with `--set nodeExporter.onlyImagesInUse=false`
