@@ -29,7 +29,9 @@ until kubectl get serviceaccount default -n default >/dev/null 2>&1; do sleep 1;
 # ---------------------------------------------------------------------------
 
 echo "==> Building and importing image"
-docker build -t "${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}" .
+EXPECTED_VERSION=$(git describe --tags --always --dirty)
+EXPECTED_COMMIT=$(git rev-parse --short HEAD)
+make docker DOCKER_IMAGE="${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}"
 "${K3D}" image import "${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}" -c "${HELM_TEST_CLUSTER}"
 
 # Pick an OCI label that we know is set on the base image
@@ -143,6 +145,10 @@ wait_for_query() {
 
 wait_for_query "exporter up" 'container_image_up'
 wait_for_query "node-exporter up" 'container_image_node_exporter_up'
+wait_for_query "exporter build_info carries the build-arg VERSION and COMMIT" \
+    "container_image_exporter_build_info{version=\"${EXPECTED_VERSION}\",revision=\"${EXPECTED_COMMIT}\"}"
+wait_for_query "node-exporter build_info carries the build-arg VERSION and COMMIT" \
+    "container_image_node_exporter_build_info{version=\"${EXPECTED_VERSION}\",revision=\"${EXPECTED_COMMIT}\"}"
 wait_for_query "exporter observed its own pod image" \
     "container_image_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\"}"
 wait_for_query "node-exporter resolved wolfi os-release from /proc/<pid>/root" \

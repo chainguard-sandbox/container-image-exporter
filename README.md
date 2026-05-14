@@ -98,11 +98,11 @@ graph TB
 
 ## Installation
 
-Build and push the image:
+Build the image.
 
 ```
-export IMAGE_REF=your.registry/container-image-exporter:latest
-docker build -t "${IMAGE_REF}" --push .
+make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
+docker push your.registry/container-image-exporter:latest
 ```
 
 Install using the Helm chart, providing your image repository and tag:
@@ -162,6 +162,7 @@ prometheus.io/path: "/metrics"
 | container_image_size_bytes      | The size of the image in the registry.                                                                 | digest                                                         |
 | container_image_created         | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
 | container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
+| container_image_exporter_build_info | Always 1; labels carry the build version, git commit, and Go runtime version.                       | version, commit, goversion                                     |
 
 ### Node Exporter
 
@@ -171,6 +172,7 @@ prometheus.io/path: "/metrics"
 | container_image_node_image_labels    | Labels from the image config.                                                                                    | image_id, key, value                                                                                                                                                                                              |
 | container_image_node_image_created   | The created date from the image config. Expressed as a Unix Epoch Time.                                          | image_id                                                                                                                                                                                                          |
 | container_image_node_exporter_up     | 1 if the last collection completed successfully, 0 otherwise.                                                    | —                                                                                                                                                                                                                 |
+| container_image_node_exporter_build_info | Always 1; labels carry the build version, git commit, and Go runtime version.                                | version, commit, goversion                                                                                                                                                                                        |
 
 By default the `container_image_node_image_*` metrics only cover images
 backing a running container. Install with `--set nodeExporter.onlyImagesInUse=false`

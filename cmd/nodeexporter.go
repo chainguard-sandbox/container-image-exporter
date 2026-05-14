@@ -56,6 +56,7 @@ Metrics exported:
 			nodeexporter.WithLabelAllowlist(neLabelAllowlist),
 		)
 		reg.MustRegister(collector)
+		reg.MustRegister(newBuildInfoCollector("container_image_node_exporter"))
 
 		http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {

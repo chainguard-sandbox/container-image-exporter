@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
@@ -96,6 +97,8 @@ var exporterCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("parsing platform: %w", err)
 		}
+
+		metrics.Registry.MustRegister(newBuildInfoCollector("container_image_exporter"))
 
 		if err = exporter.SetupControllers(
 			mgr,
