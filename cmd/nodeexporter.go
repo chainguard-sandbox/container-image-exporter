@@ -14,9 +14,11 @@ import (
 )
 
 var (
-	neMetricsAddr string
-	neCRISocket   string
-	neProcRoot    string
+	neMetricsAddr     string
+	neCRISocket       string
+	neProcRoot        string
+	neOnlyImagesInUse bool
+	neLabelAllowlist  []string
 )
 
 var nodeExporterCmd = &cobra.Command{
@@ -26,11 +28,14 @@ var nodeExporterCmd = &cobra.Command{
 exports Prometheus metrics about container images without making remote registry requests.
 
 It sources data from:
-  - The local CRI socket to enumerate running containers and resolve their PIDs
+  - The local CRI RuntimeService to enumerate running containers and resolve their PIDs
+  - The local CRI ImageService to enumerate cached images and fetch OCI labels and creation timestamps
   - The host /proc filesystem to read /etc/os-release from each container's rootfs
 
 Metrics exported:
   container_image_node_container_info  - Per-running-container info (identity + OS release fields)
+  container_image_node_image_labels    - OCI image config labels per cached image (one series per (image_id, OCI label))
+  container_image_node_image_created   - OCI image creation timestamp per cached image
   container_image_node_exporter_up     - 1 if collection succeeded, 0 otherwise`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Connect to the CRI socket. grpc.NewClient is non-blocking; the
@@ -45,7 +50,11 @@ Metrics exported:
 		defer conn.Close()
 
 		reg := prometheus.NewRegistry()
-		collector := nodeexporter.NewExporter(conn, neProcRoot)
+		collector := nodeexporter.NewExporter(conn,
+			nodeexporter.WithProcRoot(neProcRoot),
+			nodeexporter.WithOnlyImagesInUse(neOnlyImagesInUse),
+			nodeexporter.WithLabelAllowlist(neLabelAllowlist),
+		)
 		reg.MustRegister(collector)
 
 		http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
@@ -61,4 +70,9 @@ func init() {
 	nodeExporterCmd.Flags().StringVar(&neMetricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to.")
 	nodeExporterCmd.Flags().StringVar(&neCRISocket, "cri-socket", "/run/containerd/containerd.sock", "Path to the CRI socket.")
 	nodeExporterCmd.Flags().StringVar(&neProcRoot, "proc-root", "/host/proc", "Path where the host's /proc is mounted.")
+	nodeExporterCmd.Flags().BoolVar(&neOnlyImagesInUse, "only-images-in-use", true,
+		"If true (default), only export node_image_* metrics for images currently in use by a running container. "+
+			"If false, every image cached by the local CRI runtime is reported.")
+	nodeExporterCmd.Flags().StringArrayVar(&neLabelAllowlist, "label-allowlist", nil,
+		"OCI image label keys to include in container_image_node_image_labels metrics (can be specified multiple times). Emits all labels if not set.")
 }

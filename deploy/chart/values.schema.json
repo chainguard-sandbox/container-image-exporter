@@ -141,6 +141,8 @@
         "readinessProbe": { "type": "object" },
         "criSocket": { "type": "string" },
         "procRoot": { "type": "string" },
+        "onlyImagesInUse": { "type": "boolean" },
+        "labelAllowlist": { "type": "array", "items": { "type": "string" } },
         "tolerations": { "type": "array" },
         "nodeSelector": { "type": "object" },
         "affinity": { "type": "object" }

@@ -51,6 +51,39 @@ tests:
             hostPath:
               path: /run/k3s/containerd
 
+  - it: only-images-in-use defaults to true in container args
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --only-images-in-use=true
+
+  - it: only-images-in-use=false propagates from values
+    set:
+      nodeExporter.onlyImagesInUse: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --only-images-in-use=false
+
+  - it: label-allowlist is omitted when empty
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --label-allowlist=
+
+  - it: label-allowlist emits one flag per entry
+    set:
+      nodeExporter.labelAllowlist:
+        - org.opencontainers.image.version
+        - org.opencontainers.image.source
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --label-allowlist=org.opencontainers.image.version
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --label-allowlist=org.opencontainers.image.source
+
   - it: probes use the metrics named port
     asserts:
       - equal:

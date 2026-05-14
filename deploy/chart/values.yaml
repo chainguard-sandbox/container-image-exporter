@@ -206,6 +206,16 @@ nodeExporter:
   criSocket: /run/containerd/containerd.sock
   procRoot: /host/proc
 
+  # If true (default), restrict node_image_* metrics to images currently in
+  # use by a running container on this node. If false, every image cached by
+  # the local CRI runtime is reported — useful for disk/capacity analysis but
+  # noisier on nodes that have cycled through many image tags.
+  onlyImagesInUse: true
+
+  # OCI image label keys to include in container_image_node_image_labels
+  # metrics. Empty (default) emits all labels.
+  labelAllowlist: []
+
   tolerations:
     - operator: Exists
 

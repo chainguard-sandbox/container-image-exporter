@@ -15,16 +15,38 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-// fakeRuntimeServer is a minimal CRI RuntimeServiceServer for testing.
-// It returns a fixed list of containers and captures the last request for
-// inspection. The pids map is keyed by container ID and used to populate the
-// verbose ContainerStatus info JSON, mirroring what containerd/CRI-O return.
+// fakeRuntimeServer is a minimal CRI RuntimeServiceServer + ImageServiceServer
+// for testing. It returns a fixed list of containers and captures the last
+// request for inspection. The pids map is keyed by container ID and used to
+// populate the verbose ContainerStatus info JSON, mirroring what containerd /
+// CRI-O return.
 type fakeRuntimeServer struct {
 	runtimeapi.UnimplementedRuntimeServiceServer
+	runtimeapi.UnimplementedImageServiceServer
 	containers   []*runtimeapi.Container
 	pids         map[string]int
 	infoOverride map[string]string // raw info JSON keyed by container ID; takes precedence over pids
-	lastRequest  *runtimeapi.ListContainersRequest
+	// imageInfo is the raw verbose info JSON keyed by image ID, returned from
+	// ImageStatus(verbose=true).Info["info"]. Set this to runtime-shaped JSON
+	// (e.g. containerd's {"chainID":"...","imageSpec":{...}}) to exercise the
+	// image-info parser.
+	imageInfo map[string]string
+	// images is the list returned by ListImages, used to exercise the
+	// node-image collection path. Each entry's Id is also used by the
+	// ImageStatus handler to look up tag/digest data; verbose info JSON for
+	// that image still comes from the imageInfo map.
+	images []*runtimeapi.Image
+	// listImagesResult, when non-nil, overrides what ListImages returns.
+	// Useful for tests that want ListImages to surface an image that
+	// ImageStatus then can't find (i.e. a TOCTOU between the two RPCs).
+	listImagesResult []*runtimeapi.Image
+	// imageStatusErrors, when non-nil, maps an image ID to an error to
+	// return from ImageStatus instead of a normal response.
+	imageStatusErrors  map[string]error
+	lastRequest        *runtimeapi.ListContainersRequest
+	lastImageStatusReq *runtimeapi.ImageStatusRequest
+	listImagesCalls    int
+	imageStatusCalls   int
 }
 
 func (f *fakeRuntimeServer) ListContainers(_ context.Context, req *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
@@ -55,6 +77,46 @@ func (f *fakeRuntimeServer) ContainerStatus(_ context.Context, req *runtimeapi.C
 	}, nil
 }
 
+// ListImages returns the configured fake images. listImagesResult overrides
+// images when set.
+func (f *fakeRuntimeServer) ListImages(_ context.Context, _ *runtimeapi.ListImagesRequest) (*runtimeapi.ListImagesResponse, error) {
+	f.listImagesCalls++
+	result := f.listImagesResult
+	if result == nil {
+		result = f.images
+	}
+	return &runtimeapi.ListImagesResponse{Images: result}, nil
+}
+
+// ImageStatus returns an Image (matched by Id from the configured images
+// slice) plus the verbose info JSON looked up from imageInfo, both keyed by
+// the request's image ID. Returns an empty response when no entry is set.
+// If imageStatusErrors has an entry for the requested image ID, that error
+// is returned instead.
+func (f *fakeRuntimeServer) ImageStatus(_ context.Context, req *runtimeapi.ImageStatusRequest) (*runtimeapi.ImageStatusResponse, error) {
+	f.lastImageStatusReq = req
+	f.imageStatusCalls++
+	if req.Image == nil {
+		return &runtimeapi.ImageStatusResponse{}, nil
+	}
+	if err, ok := f.imageStatusErrors[req.Image.Image]; ok {
+		return nil, err
+	}
+	resp := &runtimeapi.ImageStatusResponse{}
+	for _, img := range f.images {
+		if img.Id == req.Image.Image {
+			resp.Image = img
+			break
+		}
+	}
+	if req.Verbose {
+		if raw, ok := f.imageInfo[req.Image.Image]; ok {
+			resp.Info = map[string]string{"info": raw}
+		}
+	}
+	return resp, nil
+}
+
 // startFakeRuntime starts a fake CRI gRPC server and returns a *grpc.ClientConn
 // connected to it. The server is stopped automatically when t ends.
 func startFakeRuntime(t *testing.T, srv *fakeRuntimeServer) *grpc.ClientConn {
@@ -65,6 +127,7 @@ func startFakeRuntime(t *testing.T, srv *fakeRuntimeServer) *grpc.ClientConn {
 	}
 	s := grpc.NewServer()
 	runtimeapi.RegisterRuntimeServiceServer(s, srv)
+	runtimeapi.RegisterImageServiceServer(s, srv)
 	go s.Serve(lis) //nolint:errcheck
 	t.Cleanup(s.Stop)
 

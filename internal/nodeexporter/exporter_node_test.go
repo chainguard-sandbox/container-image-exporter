@@ -53,7 +53,7 @@ func TestNode_Collect(t *testing.T) {
 	t.Cleanup(func() { conn.Close() })
 
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(NewExporter(conn, procRoot))
+	reg.MustRegister(NewExporter(conn, WithProcRoot(procRoot)))
 	mfs, err := reg.Gather()
 	if err != nil {
 		t.Fatalf("Gather: %v", err)
