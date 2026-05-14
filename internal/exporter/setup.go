@@ -3,7 +3,6 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -389,15 +388,20 @@ func SetupControllers(mgr ctrl.Manager, opts ...Option) error {
 	// coalesce into a single registry request.
 	inflight := &singleflight.Group{}
 
-	// Build a shared rate-limiting transport if either limit is configured.
-	// All reconcilers share the same transport so per-registry limits are
-	// enforced globally across all resource types.
-	// Declared as http.RoundTripper (interface) so that the zero value is a
-	// true nil interface, avoiding the typed-nil trap.
-	var transport http.RoundTripper
-	if o.registryConcurrency > 0 || o.registryRPS > 0 {
-		transport = newRegistryTransport(nil, int64(o.registryConcurrency), o.registryRPS)
+	// Determine the Prometheus registry up front: needed both for the
+	// transport's request metrics and for the Exporter collector below.
+	reg := prometheus.Registerer(metrics.Registry)
+	if o.metricsRegistry != nil {
+		reg = o.metricsRegistry
 	}
+
+	// All reconcilers share a single rate-limiting + instrumented transport
+	// so per-registry limits are enforced globally and request count + latency
+	// metrics aggregate across resource types. Constructed unconditionally:
+	// even with no concurrency or rate limits the transport still records
+	// per-host HTTP metrics, which are the only signal users have for
+	// registry-side failures.
+	transport := newRegistryTransport(nil, int64(o.registryConcurrency), o.registryRPS, reg)
 
 	// If --image-pull-secret was provided, register a Secret reconciler with
 	// the manager that rebuilds a shared keychain whenever any of the named
@@ -457,12 +461,8 @@ func SetupControllers(mgr ctrl.Manager, opts ...Option) error {
 		}
 	}
 
-	// Register an exporter with the Prometheus registry. Use the custom
-	// registry from options if set, otherwise fall back to the global one.
-	reg := prometheus.Registerer(metrics.Registry)
-	if o.metricsRegistry != nil {
-		reg = o.metricsRegistry
-	}
+	// Register the Exporter collector (reg was selected earlier so the
+	// transport could share it).
 	reg.Register(&Exporter{
 		Client:              mgr.GetClient(),
 		Cache:               cache,
