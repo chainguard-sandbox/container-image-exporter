@@ -105,8 +105,6 @@ export IMAGE_REF=your.registry/container-image-exporter:latest
 docker build -t "${IMAGE_REF}" --push .
 ```
 
-### Helm
-
 Install using the Helm chart, providing your image repository and tag:
 
 ```
@@ -143,62 +141,8 @@ If you are using Grafana (via kube-prometheus-stack), enable automatic dashboard
 --set grafana.dashboards.enabled=true
 ```
 
-### Manifests
-
-Install the cluster-wide exporter:
-
-```
-curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/exporter.yaml \
-    | sed "s|IMAGE_REF|$IMAGE_REF|g" \
-    | kubectl apply -f -
-```
-
-And/or the per-node DaemonSet:
-
-```
-curl https://raw.githubusercontent.com/chainguard-sandbox/container-image-exporter/refs/heads/main/deploy/manifests/node-exporter.yaml \
-    | sed "s|IMAGE_REF|$IMAGE_REF|g" \
-    | kubectl apply -f -
-```
-
-If you are using the [Prometheus
-Operator](https://github.com/prometheus-operator/prometheus-operator), scrape
-the components with a `ServiceMonitor`:
-
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: container-image-exporter
-spec:
-  endpoints:
-  - path: /metrics
-    port: metrics
-  namespaceSelector:
-    matchNames:
-    - container-image-exporter
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: container-image-exporter
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: container-image-node-exporter
-spec:
-  endpoints:
-  - path: /metrics
-    port: metrics
-  namespaceSelector:
-    matchNames:
-    - container-image-exporter
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: container-image-node-exporter
-```
-
-Otherwise, both components annotate their Services for common Prometheus
-auto-discovery:
+Without the Prometheus Operator, both Services are annotated by default for
+common Prometheus auto-discovery:
 
 ```yaml
 prometheus.io/scrape: "true"
@@ -229,9 +173,8 @@ prometheus.io/path: "/metrics"
 | container_image_node_exporter_up     | 1 if the last collection completed successfully, 0 otherwise.                                                    | —                                                                                                                                                                                                                 |
 
 By default the `container_image_node_image_*` metrics only cover images
-backing a running container. Set `--only-images-in-use=false` (or
-`nodeExporter.onlyImagesInUse: false`) to report every image cached by the
-local CRI runtime.
+backing a running container. Install with `--set nodeExporter.onlyImagesInUse=false`
+to report every image cached by the local CRI runtime.
 
 ## Supported Resources
 
@@ -271,23 +214,27 @@ However, you will need to give the exporter permissions to list the resources
 
 ### Permissions for CRDs
 
-The example manifests only grant permissions for the built-in resource types.
-If any of the CRDs above are installed in your cluster and you want the
-exporter to watch them, you must extend the `ClusterRole` with additional
-rules.
+The chart's default ClusterRole only grants permissions for the built-in
+resource types. If any of the CRDs above are installed in your cluster and
+you want the exporter to watch them, extend the ClusterRole via
+`exporter.rbac.extraRules` in a values file or with `--set`.
 
-For example, to add Tekton and Argo Workflows support:
+For example, to add Tekton, Knative, and Argo Workflows support, use the
+following values:
 
 ```yaml
-- apiGroups: ["tekton.dev"]
-  resources: ["tasks", "taskruns"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["serving.knative.dev"]
-  resources: ["services", "revisions"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["argoproj.io"]
-  resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
-  verbs: ["get", "list", "watch"]
+exporter:
+  rbac:
+    extraRules:
+      - apiGroups: ["tekton.dev"]
+        resources: ["tasks", "taskruns"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["serving.knative.dev"]
+        resources: ["services", "revisions"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["argoproj.io"]
+        resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
+        verbs: ["get", "list", "watch"]
 ```
 
 At startup the exporter performs a test `list` against each discovered CRD to
@@ -304,12 +251,9 @@ that consume the exporter's metrics.
 
 ## Configuration
 
-The binary exposes two subcommands, each with its own flags:
-
-```
-container-image-exporter exporter    [flags]
-container-image-exporter node-exporter [flags]
-```
+Configuration is expressed through the Helm chart's values. The examples below
+use `--set` for brevity; the same keys can be set in a values file passed with
+`-f`.
 
 ### Exporter
 
@@ -326,30 +270,19 @@ configured locally in `~/.docker/config.json`.
 
 ##### Pull Secrets
 
-Create pull secrets in the exporter's namespace (default:
-`container-image-exporter`) and provide them to the exporter with the
-`--image-pull-secret` flag. The exporter looks the named Secrets up in the
-namespace given by `--install-namespace` (set automatically to the release
-namespace by the Helm chart).
-
-```
---image-pull-secret=my-registry --image-pull-secret=other-registry
-```
-
-If deploying with the Helm chart:
+Create pull secrets in the release namespace and reference them by name. The
+exporter looks them up in the namespace the chart is installed into.
 
 ```
 --set 'exporter.imagePullSecrets[0]=my-registry' \
 --set 'exporter.imagePullSecrets[1]=other-registry'
 ```
 
-##### Cluster Wide Pull Secrets 
+##### Cluster Wide Pull Secrets
 
-Disabled by default. When `--k8s-keychain=true`, the exporter will fetch credentials
-from the pull secrets configured for the target resources in the same way the
-kubelet does. Requires cluster-wide access to Secrets and ServiceAccounts.
-
-If deploying with the Helm chart:
+Disabled by default. When enabled, the exporter fetches credentials from the
+pull secrets configured for the target resources in the same way the kubelet
+does. Requires cluster-wide access to Secrets and ServiceAccounts.
 
 ```
 --set exporter.k8sKeychain=true
@@ -362,7 +295,7 @@ caches the response for each image for a configurable amount of time. The
 default is 1 hour.
 
 ```
---cache-duration=6h
+--set exporter.cacheDuration=6h
 ```
 
 #### Multi-Architecture Images
@@ -377,15 +310,18 @@ deployed to a node.
 Override the default platform with:
 
 ```
---platform=linux/arm64
+--set exporter.platform=linux/arm64
 ```
 
 ### Node Exporter
 
 #### CRI socket
 
+Path to the CRI runtime socket on the host. Defaults to
+`/run/containerd/containerd.sock`.
+
 ```
---cri-socket=/run/containerd/containerd.sock
+--set nodeExporter.criSocket=/run/crio/crio.sock
 ```
 
 #### proc root
@@ -395,7 +331,7 @@ The node exporter reads each container's `/etc/os-release` via
 path, override it with:
 
 ```
---proc-root=/host/proc
+--set nodeExporter.procRoot=/host/proc
 ```
 
 #### Only images in use
@@ -406,12 +342,6 @@ report every image cached by the local CRI runtime (useful for tracking
 disk usage from images that aren't currently in use):
 
 ```
---only-images-in-use=false
-```
-
-With the Helm chart:
-
-```
 --set nodeExporter.onlyImagesInUse=false
 ```
 
@@ -419,15 +349,7 @@ With the Helm chart:
 
 OCI image labels can carry arbitrary builder-controlled content (SBOMs,
 multi-line descriptions, build IDs that change every build). To restrict
-`container_image_node_image_labels` to a fixed set of keys, pass
-`--label-allowlist` once per allowed key:
-
-```
---label-allowlist=org.opencontainers.image.title \
---label-allowlist=org.opencontainers.image.vendor
-```
-
-With the Helm chart:
+`container_image_node_image_labels` to a fixed set of keys:
 
 ```
 --set 'nodeExporter.labelAllowlist[0]=org.opencontainers.image.title' \
