@@ -488,3 +488,24 @@ func TestListImages_RuntimeReturnsNoImageStatus_Skips(t *testing.T) {
 		t.Fatalf("got %d images, want 0 (image with no ImageStatus should be skipped)", len(images))
 	}
 }
+
+// TestTruncateForLog covers the helper used to embed potentially-malformed
+// CRI payloads in error messages: bounded length, non-printables redacted.
+func TestTruncateForLog(t *testing.T) {
+	tests := []struct {
+		name, in, want string
+		max            int
+	}{
+		{"short ascii passes through", "hello", "hello", 10},
+		{"truncates to max", "hello world", "hello", 5},
+		{"replaces control chars", "a\x00b\nc\td", "a.b.c.d", 100},
+		{"truncate then redact", "ab\x00cd", "ab.", 3},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := truncateForLog(tc.in, tc.max); got != tc.want {
+				t.Errorf("truncateForLog(%q, %d) = %q, want %q", tc.in, tc.max, got, tc.want)
+			}
+		})
+	}
+}
