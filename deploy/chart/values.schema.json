@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
+  "additionalProperties": false,
   "required": ["image"],
   "properties": {
     "nameOverride": {
@@ -11,6 +12,7 @@
     },
     "image": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["repository"],
       "properties": {
         "repository": {
@@ -35,6 +37,7 @@
     },
     "exporter": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -45,6 +48,7 @@
         },
         "serviceAccount": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "create": { "type": "boolean" },
             "automount": { "type": "boolean" },
@@ -54,8 +58,22 @@
         },
         "rbac": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
-            "create": { "type": "boolean" }
+            "create": { "type": "boolean" },
+            "extraRules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "apiGroups": { "type": "array", "items": { "type": "string" } },
+                  "resources": { "type": "array", "items": { "type": "string" } },
+                  "resourceNames": { "type": "array", "items": { "type": "string" } },
+                  "verbs": { "type": "array", "items": { "type": "string" } },
+                  "nonResourceURLs": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
           }
         },
         "k8sKeychain": { "type": "boolean" },
@@ -73,6 +91,7 @@
         "securityContext": { "type": "object" },
         "serviceMonitor": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
             "additionalLabels": { "type": "object" }
@@ -82,6 +101,7 @@
         "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "service": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "type": {
               "type": "string",
@@ -103,12 +123,14 @@
     },
     "nodeExporter": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
         },
         "serviceAccount": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "create": { "type": "boolean" },
             "automount": { "type": "boolean" },
@@ -122,6 +144,7 @@
         "securityContext": { "type": "object" },
         "serviceMonitor": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
             "additionalLabels": { "type": "object" }
@@ -130,6 +153,7 @@
         "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "service": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "clusterIP": { "type": "string" },
             "annotations": { "type": "object" },
@@ -150,9 +174,11 @@
     },
     "grafana": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "dashboards": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
             "labels": { "type": "object" }
@@ -162,12 +188,15 @@
     },
     "tests": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "curl": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "image": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "repository": { "type": "string" },
                 "tag": { "type": "string" }

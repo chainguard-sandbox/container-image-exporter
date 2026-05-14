@@ -71,6 +71,14 @@ tests:
             resources: ["tasks"]
             verbs: ["get"]
 
+  - it: schema rejects typos under exporter.rbac (additionalProperties=false)
+    template: templates/exporter/clusterrole.yaml
+    values:
+      - ./values/rbac_typo.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "Additional property extraRule is not allowed"
+
   - it: exporter ServiceAccount is created by default
     template: templates/exporter/serviceaccount.yaml
     asserts:
