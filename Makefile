@@ -42,7 +42,7 @@ build:
 .PHONY: test
 test: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-		go test ./...
+		go test -race -shuffle=on ./...
 
 .PHONY: test-node
 test-node: $(K3D)
