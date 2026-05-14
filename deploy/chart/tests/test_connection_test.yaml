@@ -15,22 +15,22 @@ tests:
           path: metadata.annotations["helm.sh/hook-delete-policy"]
           value: before-hook-creation,hook-succeeded
 
-  - it: curls /healthz with -f
+  - it: curls /metrics with -f
     asserts:
       - contains:
           path: spec.containers[0].args
           content: -f
       - matchRegex:
           path: spec.containers[0].args[1]
-          pattern: /healthz$
+          pattern: /metrics$
 
-  - it: healthPort is used in the probe URL
+  - it: metricsPort is used in the probe URL
     set:
-      exporter.healthPort: 9091
+      exporter.metricsPort: 9090
     asserts:
       - matchRegex:
           path: spec.containers[0].args[1]
-          pattern: :9091/healthz$
+          pattern: :9090/metrics$
 
   - it: imagePullSecrets propagate
     set:
