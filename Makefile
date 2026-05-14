@@ -12,6 +12,7 @@ K3D_ARCH          := $(shell uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
 K3D               ?= $(LOCALBIN)/k3d
 NODE_TEST_CLUSTER ?= cie-node-test
 NODE_TEST_IMAGE   ?= cgr.dev/chainguard/nginx:latest
+PODS              ?= 100
 
 UNITTEST_VERSION ?= 0.8.2
 # helm-unittest release artifacts use 'macos' for Darwin rather than 'darwin'.
@@ -58,8 +59,9 @@ test-node: $(K3D)
 	docker cp $(LOCALBIN)/node-integration.test \
 		k3d-$(NODE_TEST_CLUSTER)-server-0:/node-integration.test; \
 	docker exec \
-		-e CRI_SOCKET=/run/k3s/containerd/containerd.sock \
-		k3d-$(NODE_TEST_CLUSTER)-server-0 /node-integration.test -test.v
+		k3d-$(NODE_TEST_CLUSTER)-server-0 \
+		/node-integration.test -test.v -pods=$(PODS) \
+		-cri.socket=/run/k3s/containerd/containerd.sock
 
 .PHONY: test-helm test-helm-lint test-helm-unit test-helm-integration
 
