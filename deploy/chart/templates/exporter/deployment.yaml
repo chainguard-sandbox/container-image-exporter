@@ -49,6 +49,7 @@ spec:
             - --cache-duration={{ .Values.exporter.cacheDuration }}
             - --registry-concurrency={{ .Values.exporter.registryConcurrency }}
             - --registry-rps={{ .Values.exporter.registryRps }}
+            - --registry-timeout={{ .Values.exporter.registryTimeout }}
             # Always set so --image-pull-secret can look up Secrets in the
             # release namespace. Harmless when --image-pull-secret is unset.
             - --install-namespace={{ .Release.Namespace }}

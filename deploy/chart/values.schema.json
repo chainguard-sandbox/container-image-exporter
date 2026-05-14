@@ -81,6 +81,7 @@
         "cacheDuration": { "type": "string" },
         "registryConcurrency": { "type": "integer", "minimum": 0 },
         "registryRps": { "type": "number", "minimum": 0 },
+        "registryTimeout": { "type": "string" },
         "namespaces": { "type": "array", "items": { "type": "string" } },
         "annotationAllowlist": { "type": "array", "items": { "type": "string" } },
         "labelAllowlist": { "type": "array", "items": { "type": "string" } },
