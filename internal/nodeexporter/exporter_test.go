@@ -424,7 +424,11 @@ func TestExporter_Collect_NodeImage_AllImages(t *testing.T) {
 	}
 
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(NewExporter(startFakeRuntime(t, srv), WithProcRoot(procRoot)))
+	reg.MustRegister(NewExporter(
+		startFakeRuntime(t, srv),
+		WithProcRoot(procRoot),
+		WithOnlyImagesInUse(false),
+	))
 	mfs, err := reg.Gather()
 	if err != nil {
 		t.Fatalf("Gather: %v", err)
