@@ -98,7 +98,7 @@ graph TB
 
 ## Installation
 
-Build the image.
+Build and push the image:
 
 ```
 make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
