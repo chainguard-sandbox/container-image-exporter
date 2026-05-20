@@ -26,8 +26,4 @@ spec:
       port: {{ .Values.exporter.metricsPort }}
       targetPort: metrics
       protocol: TCP
-    - name: health
-      port: {{ .Values.exporter.healthPort }}
-      targetPort: health
-      protocol: TCP
 {{- end }}

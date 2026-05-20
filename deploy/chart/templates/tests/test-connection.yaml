@@ -19,6 +19,6 @@ spec:
       image: "{{ .Values.tests.curl.image.repository }}:{{ .Values.tests.curl.image.tag }}"
       args:
         - -f
-        - http://{{ include "container-image-exporter.fullname" . }}:{{ .Values.exporter.healthPort }}/healthz
+        - http://{{ include "container-image-exporter.fullname" . }}:{{ .Values.exporter.metricsPort }}/metrics
   restartPolicy: Never
 {{- end }}

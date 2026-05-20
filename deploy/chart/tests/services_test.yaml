@@ -5,7 +5,7 @@ release:
 set:
   image.repository: foo
 tests:
-  - it: exporter service renders with both ports
+  - it: exporter service exposes only the metrics port
     template: templates/exporter/service.yaml
     asserts:
       - isKind:
@@ -20,7 +20,10 @@ tests:
             port: 8080
             targetPort: metrics
             protocol: TCP
-      - contains:
+      # The health port is kubelet-internal (probes hit the Pod IP directly);
+      # there's no scraper-facing consumer, so the Service intentionally
+      # doesn't expose it.
+      - notContains:
           path: spec.ports
           content:
             name: health
