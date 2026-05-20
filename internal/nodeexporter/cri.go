@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
+	"unicode"
 
 	"google.golang.org/grpc"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -210,7 +212,7 @@ func containerPID(ctx context.Context, rt runtimeapi.RuntimeServiceClient, id st
 		PID *int `json:"pid"`
 	}
 	if err := json.Unmarshal([]byte(raw), &v); err != nil {
-		return nil, fmt.Errorf("parsing info JSON: %w", err)
+		return nil, fmt.Errorf("parsing info JSON (len=%d, prefix=%q): %w", len(raw), truncateForLog(raw, 256), err)
 	}
 	return v.PID, nil
 }
@@ -280,4 +282,20 @@ func parseImageInfo(verbose map[string]string) imageMetadata {
 	}
 
 	return out
+}
+
+// truncateForLog returns a printable, length-bounded version of s suitable
+// for embedding in an error message. Non-printable bytes are replaced with
+// '.' so a runtime sending binary or control-character noise can't corrupt
+// the log line.
+func truncateForLog(s string, max int) string {
+	if len(s) > max {
+		s = s[:max]
+	}
+	return strings.Map(func(r rune) rune {
+		if !unicode.IsPrint(r) {
+			return '.'
+		}
+		return r
+	}, s)
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -58,12 +59,18 @@ Metrics exported:
 		reg.MustRegister(collector)
 		reg.MustRegister(newBuildInfoCollector("container_image_node_exporter"))
 
-		http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
-		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		return http.ListenAndServe(neMetricsAddr, nil)
+		srv := &http.Server{
+			Addr:              neMetricsAddr,
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		return srv.ListenAndServe()
 	},
 }
 

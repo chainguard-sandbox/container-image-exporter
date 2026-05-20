@@ -8,7 +8,50 @@ HELM_TEST_IMAGE_TAG="${HELM_TEST_IMAGE_TAG:-helm-test}"
 HELM_TEST_NAMESPACE="${HELM_TEST_NAMESPACE:-container-image-exporter}"
 HELM_MONITORING_NS="${HELM_MONITORING_NS:-monitoring}"
 
+# diagnose dumps cluster state and component logs on failure. Best-effort.
+diagnose() {
+    echo
+    echo "========================================================================"
+    echo "  DIAGNOSTICS"
+    echo "========================================================================"
+
+    echo "==> Pods (all namespaces):"
+    kubectl get pods -A -o wide 2>&1 || true
+
+    echo "==> ServiceMonitors:"
+    kubectl get servicemonitor -A 2>&1 || true
+
+    echo "==> Events (last 50, sorted by time):"
+    kubectl get events -A --sort-by=.lastTimestamp 2>/dev/null | tail -50 || true
+
+    echo "==> Exporter pod describe:"
+    kubectl describe pod -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=exporter 2>&1 || true
+
+    echo "==> Exporter logs (last 200):"
+    kubectl logs -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=exporter --tail=200 2>&1 || true
+
+    echo "==> Node-exporter logs (last 100):"
+    kubectl logs -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=node-exporter --tail=100 2>&1 || true
+
+    echo "==> Prometheus operator logs (last 100):"
+    kubectl logs -n "${HELM_MONITORING_NS}" -l app=kube-prometheus-stack-operator --tail=100 2>&1 || true
+
+    echo "==> Prometheus pod logs (last 100):"
+    kubectl logs -n "${HELM_MONITORING_NS}" -l app.kubernetes.io/name=prometheus -c prometheus --tail=100 2>&1 || true
+
+    echo "==> Prometheus active targets (requires live port-forward):"
+    curl -sS --max-time 5 http://localhost:9090/api/v1/targets 2>&1 || true
+    echo
+    echo "==> Prometheus loaded config (head):"
+    curl -sS --max-time 5 http://localhost:9090/api/v1/status/config 2>&1 | head -80 || true
+    echo
+}
+
 cleanup() {
+    local exit_code=$?
+    if [ "${exit_code}" -ne 0 ]; then
+        diagnose || true
+    fi
     echo "==> Cleaning up"
     kill "${PF_PID:-}" 2>/dev/null || true
     "${K3D}" cluster delete "${HELM_TEST_CLUSTER}" 2>/dev/null || true
@@ -125,10 +168,12 @@ prom_query() {
         --data-urlencode "query=$1"
 }
 
+# wait_for_query polls Prometheus until the given PromQL expression returns
+# at least one series, or `attempts` (default 60) elapses at 2s intervals.
 wait_for_query() {
     local desc="$1"
     local expr="$2"
-    local attempts=60
+    local attempts="${3:-60}"
     echo "==> Checking: ${desc}"
     for i in $(seq 1 "${attempts}"); do
         if prom_query "${expr}" | grep -q '"result":\[{'; then
@@ -142,6 +187,12 @@ wait_for_query() {
     echo "  Query: ${expr}"
     return 1
 }
+
+# Wait for both jobs to be scraped before checking individual metrics.
+wait_for_query "Prometheus has scraped at least one exporter target" \
+    'up{job="container-image-exporter"} == 1' 90
+wait_for_query "Prometheus has scraped at least one node-exporter target" \
+    'up{job="container-image-exporter-node-exporter"} == 1' 90
 
 wait_for_query "exporter up" 'container_image_up'
 wait_for_query "node-exporter up" 'container_image_node_exporter_up'
