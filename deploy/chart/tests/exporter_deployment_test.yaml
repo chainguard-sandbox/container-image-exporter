@@ -116,6 +116,20 @@ tests:
           path: spec.template.spec.containers[0].args
           content: --namespaces=kube-system
 
+  - it: registryTimeout defaults to 30s
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --registry-timeout=30s
+
+  - it: registryTimeout override propagates
+    set:
+      exporter.registryTimeout: 2m
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --registry-timeout=2m
+
   - it: imagePullSecrets become repeated --image-pull-secret flags
     set:
       exporter.imagePullSecrets:

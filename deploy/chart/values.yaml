@@ -44,6 +44,8 @@ exporter:
   cacheDuration: 1h
   registryConcurrency: 10
   registryRps: 5
+  # Per-image timeout for registry requests. Set to "0" to disable.
+  registryTimeout: 30s
   namespaces: []
   annotationAllowlist: []
   labelAllowlist: []
