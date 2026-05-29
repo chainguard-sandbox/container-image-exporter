@@ -30,6 +30,8 @@ concurrency:
   # commit gets a full test report.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions: {}
+
 jobs:
   test-helm:
     runs-on: ubuntu-latest
