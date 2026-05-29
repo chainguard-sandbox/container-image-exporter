@@ -4,6 +4,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -12,6 +14,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3
     groups:
       # k8s.io/* and sigs.k8s.io/controller-runtime move in lockstep with the
       # Kubernetes release cycle and frequently require coordinated bumps to
