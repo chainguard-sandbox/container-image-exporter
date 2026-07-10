@@ -17,3 +17,13 @@ Common types:
 Breaking changes: append `!` after the type/scope (e.g. `feat!:`) or include a `BREAKING CHANGE:` footer to trigger a major bump.
 
 Keep the subject line under ~72 characters and in the imperative mood.
+
+# Component diagrams
+
+The mermaid architecture diagrams for each component are duplicated in three places:
+
+- `README.md` (Components section)
+- `docs/exporter.md`
+- `docs/node-exporter.md`
+
+If you modify one of the diagrams, apply the same change to the other two locations so they stay in sync.
