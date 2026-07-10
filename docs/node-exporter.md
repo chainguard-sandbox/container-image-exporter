@@ -39,22 +39,20 @@ make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
 docker push your.registry/container-image-exporter:latest
 ```
 
-To deploy only the node-exporter (with the cluster-wide cluster-exporter Deployment
-disabled):
+Install the chart:
 
 ```
-helm install container-image-exporter ./deploy/chart \
+helm install container-image-exporter-node ./deploy/charts/node-exporter \
     --namespace container-image-exporter \
     --create-namespace \
     --set image.repository=your.registry/container-image-exporter \
-    --set image.tag=latest \
-    --set clusterExporter.enabled=false
+    --set image.tag=latest
 ```
 
 If you are using the Prometheus Operator, enable the ServiceMonitor:
 
 ```
---set nodeExporter.serviceMonitor.enabled=true
+--set serviceMonitor.enabled=true
 ```
 
 If you are using Grafana (via kube-prometheus-stack), enable automatic
@@ -63,9 +61,6 @@ dashboard provisioning:
 ```
 --set grafana.dashboards.enabled=true
 ```
-
-See the [installation instructions](../README.md#installation) for
-more details.
 
 ## Metrics
 
@@ -78,13 +73,13 @@ more details.
 | container_image_node_exporter_build_info | Always 1; labels carry the build version, git commit, and Go runtime version.                                | version, commit, goversion                                                                                                                                                                                        |
 
 By default the `container_image_node_image_*` metrics only cover images
-backing a running container. Install with `--set nodeExporter.onlyImagesInUse=false`
+backing a running container. Install with `--set onlyImagesInUse=false`
 to report every image cached by the local CRI runtime.
 
 ## Example Queries
 
-See the [Grafana dashboards](../deploy/chart/dashboards) for more complete
-examples of how to consume the metrics.
+See the [Grafana dashboards](../deploy/charts/node-exporter/dashboards) for
+more complete examples of how to consume the metrics.
 
 ### OS Distribution Breakdown Across Running Containers
 
@@ -151,7 +146,7 @@ Path to the CRI runtime socket on the host. Defaults to
 `/run/containerd/containerd.sock`.
 
 ```
---set nodeExporter.criSocket=/run/crio/crio.sock
+--set criSocket=/run/crio/crio.sock
 ```
 
 ### proc root
@@ -161,7 +156,7 @@ The node exporter reads each container's `/etc/os-release` via
 path, override it with:
 
 ```
---set nodeExporter.procRoot=/host/proc
+--set procRoot=/host/proc
 ```
 
 ### Only images in use
@@ -172,7 +167,7 @@ report every image cached by the local CRI runtime (useful for tracking
 disk usage from images that aren't currently in use):
 
 ```
---set nodeExporter.onlyImagesInUse=false
+--set onlyImagesInUse=false
 ```
 
 ### Label allowlist
@@ -182,8 +177,8 @@ multi-line descriptions, build IDs that change every build). To restrict
 `container_image_node_image_labels` to a fixed set of keys:
 
 ```
---set 'nodeExporter.labelAllowlist[0]=org.opencontainers.image.title' \
---set 'nodeExporter.labelAllowlist[1]=org.opencontainers.image.vendor'
+--set 'labelAllowlist[0]=org.opencontainers.image.title' \
+--set 'labelAllowlist[1]=org.opencontainers.image.vendor'
 ```
 
 When unset (the default), every label on every reported image is emitted.

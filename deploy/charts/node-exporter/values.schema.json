@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image"],
+  "properties": {
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Container image repository (required)"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": { "type": "boolean" },
+        "automount": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "name": { "type": "string" }
+      }
+    },
+    "podAnnotations": { "type": "object" },
+    "podLabels": { "type": "object" },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "serviceMonitor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "additionalLabels": { "type": "object" }
+      }
+    },
+    "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterIP": { "type": "string" },
+        "annotations": { "type": "object" },
+        "scrapeAnnotations": { "type": "boolean" }
+      }
+    },
+    "resources": { "type": "object" },
+    "livenessProbe": { "type": "object" },
+    "readinessProbe": { "type": "object" },
+    "criSocket": { "type": "string" },
+    "procRoot": { "type": "string" },
+    "onlyImagesInUse": { "type": "boolean" },
+    "labelAllowlist": { "type": "array", "items": { "type": "string" } },
+    "tolerations": { "type": "array" },
+    "nodeSelector": { "type": "object" },
+    "affinity": { "type": "object" },
+    "grafana": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dashboards": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "labels": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}

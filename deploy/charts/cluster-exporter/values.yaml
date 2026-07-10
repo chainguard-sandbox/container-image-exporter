@@ -1,0 +1,156 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ""
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+
+replicaCount: 1
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+rbac:
+  create: true
+  # Additional ClusterRole rules appended to the defaults.
+  # Use this to grant the cluster-exporter access to CRDs it can auto-discover.
+  # Examples for supported CRD groups:
+  #
+  # extraRules:
+  #   - apiGroups: ["tekton.dev"]
+  #     resources: ["tasks", "taskruns"]
+  #     verbs: ["get", "list", "watch"]
+  #   - apiGroups: ["serving.knative.dev"]
+  #     resources: ["services", "revisions"]
+  #     verbs: ["get", "list", "watch"]
+  #   - apiGroups: ["argoproj.io"]
+  #     resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
+  #     verbs: ["get", "list", "watch"]
+  extraRules: []
+
+# When true, the cluster-exporter uses the pull secrets configured for the target
+# resource as registry credentials. Requires cluster-wide access to Secrets
+# and ServiceAccounts.
+k8sKeychain: false
+platform: linux/amd64
+cacheDuration: 1h
+registryConcurrency: 10
+registryRps: 5
+# Per-image timeout for registry requests. Set to "0" to disable.
+registryTimeout: 30s
+namespaces: []
+annotationAllowlist: []
+labelAllowlist: []
+
+# Names of Secrets in the release namespace to use as registry
+# credentials.
+#
+# registryPullSecrets:
+#   - my-private-registry
+registryPullSecrets: []
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  seccompProfile:
+    type: RuntimeDefault
+  capabilities:
+    drop:
+    - ALL
+
+serviceMonitor:
+  enabled: false
+  # Extra labels applied to the ServiceMonitor metadata. kube-prometheus-stack
+  # requires a `release: <name>` label by default (matching the Prometheus
+  # release) for the ServiceMonitor to be picked up.
+  #
+  # additionalLabels:
+  #   release: prometheus
+  additionalLabels: {}
+
+metricsPort: 8080
+healthPort: 8081
+
+service:
+  type: ClusterIP
+  annotations: {}
+  # Emit prometheus.io/{scrape,port,path} annotations on the Service. Set to
+  # false when scraping exclusively via ServiceMonitor to avoid duplicate
+  # scraping from Prometheus instances that honour both mechanisms.
+  scrapeAnnotations: true
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: health
+  initialDelaySeconds: 15
+  periodSeconds: 20
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# To pull images from private registries, mount a docker config secret here.
+# Create the secret first:
+#   kubectl create secret docker-registry my-docker-config \
+#     --docker-server=<registry> \
+#     --docker-username=<user> \
+#     --docker-password=<token>
+# Then reference it below:
+volumes: []
+# - name: docker-config
+#   secret:
+#     secretName: my-docker-config
+#     items:
+#       - key: .dockerconfigjson
+#         path: config.json
+
+volumeMounts: []
+# - name: docker-config
+#   mountPath: /home/nonroot/.docker
+#   readOnly: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+grafana:
+  dashboards:
+    # Set to true to create ConfigMaps containing the Grafana dashboards.
+    # Requires the Grafana sidecar to be configured to watch for the label below.
+    # When using kube-prometheus-stack, ensure sidecar.dashboards.searchNamespace
+    # includes the namespace this chart is deployed into, or is set to ALL.
+    enabled: false
+    # Labels applied to each dashboard ConfigMap for Grafana sidecar auto-discovery.
+    # Must match sidecar.dashboards.label in your kube-prometheus-stack values.
+    labels:
+      grafana_dashboard: "1"
+
+tests:
+  curl:
+    image:
+      repository: cgr.dev/chainguard/curl
+      tag: latest

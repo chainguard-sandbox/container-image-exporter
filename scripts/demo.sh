@@ -102,22 +102,30 @@ kubectl create secret docker-registry cgr-docker-config \
     --docker-password="${CGR_TOKEN}" \
     --dry-run=client -o yaml | kubectl apply -f -
 
-echo "==> Installing container-image-exporter chart"
-helm install container-image-exporter ./deploy/chart \
+echo "==> Installing cluster-exporter chart"
+helm install container-image-exporter-cluster ./deploy/charts/cluster-exporter \
     --namespace "${DEMO_NAMESPACE}" --create-namespace \
     --set image.repository="${DEMO_IMAGE_REPO}" \
     --set image.tag="${DEMO_IMAGE_TAG}" \
-    --set clusterExporter.serviceMonitor.enabled=true \
-    --set nodeExporter.serviceMonitor.enabled=true \
-    --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock \
+    --set serviceMonitor.enabled=true \
     --set grafana.dashboards.enabled=true \
-    --set "clusterExporter.volumes[0].name=docker-config" \
-    --set "clusterExporter.volumes[0].secret.secretName=cgr-docker-config" \
-    --set "clusterExporter.volumes[0].secret.items[0].key=.dockerconfigjson" \
-    --set "clusterExporter.volumes[0].secret.items[0].path=config.json" \
-    --set "clusterExporter.volumeMounts[0].name=docker-config" \
-    --set "clusterExporter.volumeMounts[0].mountPath=/home/nonroot/.docker" \
-    --set "clusterExporter.volumeMounts[0].readOnly=true" \
+    --set "volumes[0].name=docker-config" \
+    --set "volumes[0].secret.secretName=cgr-docker-config" \
+    --set "volumes[0].secret.items[0].key=.dockerconfigjson" \
+    --set "volumes[0].secret.items[0].path=config.json" \
+    --set "volumeMounts[0].name=docker-config" \
+    --set "volumeMounts[0].mountPath=/home/nonroot/.docker" \
+    --set "volumeMounts[0].readOnly=true" \
+    --wait --timeout=5m
+
+echo "==> Installing node-exporter chart"
+helm install container-image-exporter-node ./deploy/charts/node-exporter \
+    --namespace "${DEMO_NAMESPACE}" --create-namespace \
+    --set image.repository="${DEMO_IMAGE_REPO}" \
+    --set image.tag="${DEMO_IMAGE_TAG}" \
+    --set serviceMonitor.enabled=true \
+    --set criSocket=/run/k3s/containerd/containerd.sock \
+    --set grafana.dashboards.enabled=true \
     --wait --timeout=5m
 
 # ---------------------------------------------------------------------------

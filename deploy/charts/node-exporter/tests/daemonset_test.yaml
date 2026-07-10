@@ -1,0 +1,112 @@
+suite: node-exporter daemonset
+templates:
+  - templates/daemonset.yaml
+release:
+  name: cie
+set:
+  image.repository: foo
+tests:
+  - it: renders a DaemonSet by default
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: DaemonSet
+      - equal:
+          path: metadata.name
+          value: cie-container-image-exporter-node
+
+  - it: metricsPort drives --metrics-bind-address and the container port
+    set:
+      metricsPort: 9092
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --metrics-bind-address=:9092
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: metrics
+            containerPort: 9092
+            protocol: TCP
+
+  - it: cri-socket args and mount come from criSocket value
+    set:
+      criSocket: /run/k3s/containerd/containerd.sock
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --cri-socket=/run/k3s/containerd/containerd.sock
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: cri-sock
+            hostPath:
+              path: /run/k3s/containerd
+
+  - it: only-images-in-use defaults to true in container args
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --only-images-in-use=true
+
+  - it: only-images-in-use=false propagates from values
+    set:
+      onlyImagesInUse: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --only-images-in-use=false
+
+  - it: label-allowlist is omitted when empty
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --label-allowlist=
+
+  - it: label-allowlist emits one flag per entry
+    set:
+      labelAllowlist:
+        - org.opencontainers.image.version
+        - org.opencontainers.image.source
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --label-allowlist=org.opencontainers.image.version
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --label-allowlist=org.opencontainers.image.source
+
+  - it: probes use the metrics named port
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: metrics
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: metrics
+
+  - it: imagePullSecrets propagate
+    set:
+      imagePullSecrets:
+        - name: my-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: my-secret
+
+  - it: retains SYS_PTRACE capability
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].securityContext.capabilities.add
+          content: SYS_PTRACE
+
+  - it: carries component=node-exporter label
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: node-exporter
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: node-exporter

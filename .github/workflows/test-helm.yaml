@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'deploy/chart/**'
+      - 'deploy/charts/**'
       - 'scripts/test-helm-*.sh'
       - 'Makefile'
       - '.github/workflows/test-helm.yaml'
@@ -15,7 +15,7 @@ on:
       - '**/*.go'
   pull_request:
     paths:
-      - 'deploy/chart/**'
+      - 'deploy/charts/**'
       - 'scripts/test-helm-*.sh'
       - 'Makefile'
       - '.github/workflows/test-helm.yaml'

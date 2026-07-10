@@ -57,15 +57,14 @@ make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
 docker push your.registry/container-image-exporter:latest
 ```
 
-To deploy only the cluster-exporter (with the node-exporter DaemonSet disabled):
+Install the chart:
 
 ```
-helm install container-image-exporter ./deploy/chart \
+helm install container-image-exporter-cluster ./deploy/charts/cluster-exporter \
     --namespace container-image-exporter \
     --create-namespace \
     --set image.repository=your.registry/container-image-exporter \
-    --set image.tag=latest \
-    --set nodeExporter.enabled=false
+    --set image.tag=latest
 ```
 
 To fetch metadata from privately hosted images, the exporter needs registry
@@ -74,7 +73,7 @@ credentials — see [Credentials](#credentials) for the available options.
 If you are using the Prometheus Operator, enable the ServiceMonitor:
 
 ```
---set clusterExporter.serviceMonitor.enabled=true
+--set serviceMonitor.enabled=true
 ```
 
 If you are using Grafana (via kube-prometheus-stack), enable automatic
@@ -84,8 +83,6 @@ dashboard provisioning:
 --set grafana.dashboards.enabled=true
 ```
 
-See the [installation instructions](../README.md#installation) for
-more details.
 
 ## Metrics
 
@@ -103,8 +100,8 @@ more details.
 
 ## Example Queries
 
-See the [Grafana dashboards](../deploy/chart/dashboards) for more complete
-examples of how to consume the metrics.
+See the [Grafana dashboards](../deploy/charts/cluster-exporter/dashboards) for
+more complete examples of how to consume the metrics.
 
 ### Percentage of Containers Based on Chainguard
 
@@ -196,8 +193,8 @@ Create pull secrets in the release namespace and reference them by name. The
 exporter looks them up in the namespace the chart is installed into.
 
 ```
---set 'clusterExporter.imagePullSecrets[0]=my-registry' \
---set 'clusterExporter.imagePullSecrets[1]=other-registry'
+--set 'registryPullSecrets[0]=my-registry' \
+--set 'registryPullSecrets[1]=other-registry'
 ```
 
 #### Cluster Wide Pull Secrets
@@ -207,7 +204,7 @@ pull secrets configured for the target resources in the same way the kubelet
 does. Requires cluster-wide access to Secrets and ServiceAccounts.
 
 ```
---set clusterExporter.k8sKeychain=true
+--set k8sKeychain=true
 ```
 
 ### Cache Duration
@@ -217,7 +214,7 @@ caches the response for each image for a configurable amount of time. The
 default is 1 hour.
 
 ```
---set clusterExporter.cacheDuration=6h
+--set cacheDuration=6h
 ```
 
 ### Multi-Architecture Images
@@ -232,7 +229,7 @@ deployed to a node.
 Override the default platform with:
 
 ```
---set clusterExporter.platform=linux/arm64
+--set platform=linux/arm64
 ```
 
 ## Supported Resources
@@ -276,24 +273,23 @@ However, you will need to give the exporter permissions to list the resources
 The chart's default ClusterRole only grants permissions for the built-in
 resource types. If any of the CRDs above are installed in your cluster and
 you want the exporter to watch them, extend the ClusterRole via
-`exporter.rbac.extraRules` in a values file or with `--set`.
+`rbac.extraRules` in a values file or with `--set`.
 
 For example, to add Tekton, Knative, and Argo Workflows support, use the
 following values:
 
 ```yaml
-clusterExporter:
-  rbac:
-    extraRules:
-      - apiGroups: ["tekton.dev"]
-        resources: ["tasks", "taskruns"]
-        verbs: ["get", "list", "watch"]
-      - apiGroups: ["serving.knative.dev"]
-        resources: ["services", "revisions"]
-        verbs: ["get", "list", "watch"]
-      - apiGroups: ["argoproj.io"]
-        resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
-        verbs: ["get", "list", "watch"]
+rbac:
+  extraRules:
+    - apiGroups: ["tekton.dev"]
+      resources: ["tasks", "taskruns"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["serving.knative.dev"]
+      resources: ["services", "revisions"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["argoproj.io"]
+      resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
+      verbs: ["get", "list", "watch"]
 ```
 
 At startup the exporter performs a test `list` against each discovered CRD to

@@ -100,59 +100,25 @@ graph TB
 
 ## Installation
 
-Build and push the image:
+For now, you need to build and host the image yourself:
 
 ```
 make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
 docker push your.registry/container-image-exporter:latest
 ```
 
-Install using the Helm chart, providing your image repository and tag:
+Each component has its own Helm chart. Install one or both, depending on which
+components you want to deploy:
 
-```
-helm install container-image-exporter ./deploy/chart \
-    --namespace container-image-exporter \
-    --create-namespace \
-    --set image.repository=your.registry/container-image-exporter \
-    --set image.tag=latest
-```
-
-Both components are enabled by default. To deploy only one of them:
-
-```
-# Disable the node-exporter Daemonset
---set nodeExporter.enabled=false
-
-# Or, disable the cluster-exporter Deployment
---set clusterExporter.enabled=false
-```
-
-If you are using the Prometheus Operator, enable the ServiceMonitors:
-
-```
---set clusterExporter.serviceMonitor.enabled=true \
---set nodeExporter.serviceMonitor.enabled=true
-```
-
-If you are using Grafana (via kube-prometheus-stack), enable automatic dashboard provisioning:
-
-```
---set grafana.dashboards.enabled=true
-```
-
-Without the Prometheus Operator, both Services are annotated by default for
-common Prometheus auto-discovery:
-
-```yaml
-prometheus.io/scrape: "true"
-prometheus.io/port: "8080"
-prometheus.io/path: "/metrics"
-```
+- [Node Exporter](./docs/node-exporter.md#installation)
+- [Cluster Exporter](./docs/cluster-exporter.md#installation)
 
 ## Dashboards
 
-See [dashboards](./deploy/chart/dashboards) for examples of Grafana dashboards
-that consume the exporters' metrics.
+The respective Helm charts contain Grafana dashboards for each component:
+
+- [Node Exporter](./deploy/charts/node-exporter/dashboards)
+- [Cluster Exporter](./deploy/charts/cluster-exporter/dashboards)
 
 ## Development
 

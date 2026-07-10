@@ -1,0 +1,48 @@
+suite: grafana dashboard
+templates:
+  - templates/dashboard.yaml
+release:
+  name: cie
+set:
+  image.repository: foo
+tests:
+  - it: not rendered by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when enabled
+    set:
+      grafana.dashboards.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+
+  - it: ConfigMap carries the default sidecar label
+    set:
+      grafana.dashboards.enabled: true
+    asserts:
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+
+  - it: custom sidecar label is applied
+    set:
+      grafana.dashboards.enabled: true
+      grafana.dashboards.labels:
+        grafana_dashboard: "1"
+        mycorp-dashboard: "true"
+    asserts:
+      - equal:
+          path: metadata.labels["mycorp-dashboard"]
+          value: "true"
+
+  - it: node-exporter ConfigMap embeds the dashboard JSON
+    set:
+      grafana.dashboards.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["node-exporter-chainguard-adoption.json"]
+          pattern: '"title"'
