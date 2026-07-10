@@ -39,7 +39,7 @@ make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
 docker push your.registry/container-image-exporter:latest
 ```
 
-To deploy only the node-exporter (with the cluster-wide exporter Deployment
+To deploy only the node-exporter (with the cluster-wide cluster-exporter Deployment
 disabled):
 
 ```
@@ -48,7 +48,7 @@ helm install container-image-exporter ./deploy/chart \
     --create-namespace \
     --set image.repository=your.registry/container-image-exporter \
     --set image.tag=latest \
-    --set exporter.enabled=false
+    --set clusterExporter.enabled=false
 ```
 
 If you are using the Prometheus Operator, enable the ServiceMonitor:
@@ -114,7 +114,7 @@ propagated from the base image:
     count(container_image_node_container_info)
 ```
 
-Unlike the label-based query in the [exporter docs](./exporter.md#percentage-of-containers-based-on-chainguard),
+Unlike the label-based query in the [cluster-exporter docs](./cluster-exporter.md#percentage-of-containers-based-on-chainguard),
 this counts running containers on nodes rather than container specs, so
 results are skewed by Deployments and DaemonSets that run many replicas.
 

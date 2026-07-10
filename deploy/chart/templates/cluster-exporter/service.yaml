@@ -1,0 +1,29 @@
+{{- if .Values.clusterExporter.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "container-image-exporter.clusterExporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.clusterExporter.labels" . | nindent 4 }}
+  {{- if or .Values.clusterExporter.service.scrapeAnnotations .Values.clusterExporter.service.annotations }}
+  annotations:
+    {{- if .Values.clusterExporter.service.scrapeAnnotations }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ .Values.clusterExporter.metricsPort | quote }}
+    prometheus.io/path: "/metrics"
+    {{- end }}
+    {{- with .Values.clusterExporter.service.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    {{- include "container-image-exporter.clusterExporter.selectorLabels" . | nindent 4 }}
+  type: {{ .Values.clusterExporter.service.type }}
+  ports:
+    - name: metrics
+      port: {{ .Values.clusterExporter.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+{{- end }}

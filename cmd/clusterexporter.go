@@ -23,13 +23,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
+	"github.com/chainguard-sandbox/container-image-exporter/internal/clusterexporter"
 )
 
 var scheme = runtime.NewScheme()
 
 func init() {
-	utilruntime.Must(exporter.AddToScheme(scheme))
+	utilruntime.Must(clusterexporter.AddToScheme(scheme))
 }
 
 var (
@@ -48,8 +48,8 @@ var (
 	imagePullSecrets    []string
 )
 
-var exporterCmd = &cobra.Command{
-	Use:   "exporter",
+var clusterExporterCmd = &cobra.Command{
+	Use:   "cluster-exporter",
 	Short: "Watch Kubernetes resources and export image metadata fetched from registries.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := zap.Options{}
@@ -98,20 +98,20 @@ var exporterCmd = &cobra.Command{
 			return fmt.Errorf("parsing platform: %w", err)
 		}
 
-		metrics.Registry.MustRegister(newBuildInfoCollector("container_image_exporter"))
+		metrics.Registry.MustRegister(newBuildInfoCollector("container_image_cluster_exporter"))
 
-		if err = exporter.SetupControllers(
+		if err = clusterexporter.SetupControllers(
 			mgr,
-			exporter.WithCacheDuration(cacheDuration),
-			exporter.WithK8sKeychain(k8sKeychain),
-			exporter.WithPlatform(p),
-			exporter.WithRegistryConcurrency(registryConcurrency),
-			exporter.WithRegistryRPS(registryRPS),
-			exporter.WithRegistryTimeout(registryTimeout),
-			exporter.WithAnnotationAllowlist(annotationAllowlist),
-			exporter.WithLabelAllowlist(labelAllowlist),
-			exporter.WithInstallNamespace(installNamespace),
-			exporter.WithImagePullSecrets(imagePullSecrets),
+			clusterexporter.WithCacheDuration(cacheDuration),
+			clusterexporter.WithK8sKeychain(k8sKeychain),
+			clusterexporter.WithPlatform(p),
+			clusterexporter.WithRegistryConcurrency(registryConcurrency),
+			clusterexporter.WithRegistryRPS(registryRPS),
+			clusterexporter.WithRegistryTimeout(registryTimeout),
+			clusterexporter.WithAnnotationAllowlist(annotationAllowlist),
+			clusterexporter.WithLabelAllowlist(labelAllowlist),
+			clusterexporter.WithInstallNamespace(installNamespace),
+			clusterexporter.WithImagePullSecrets(imagePullSecrets),
 		); err != nil {
 			return fmt.Errorf("setting up controllers: %w", err)
 		}
@@ -144,17 +144,17 @@ var exporterCmd = &cobra.Command{
 }
 
 func init() {
-	exporterCmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	exporterCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	exporterCmd.Flags().StringVar(&platform, "platform", "", "The default platform to resolve multi-arch images to. Defaults to the platform the exporter is running on.")
-	exporterCmd.Flags().DurationVar(&cacheDuration, "cache-duration", 1*time.Hour, "How long to cache image details for before querying the registry again.")
-	exporterCmd.Flags().BoolVar(&k8sKeychain, "k8s-keychain", false, "Whether to fetch credentials from pulls secrets in the cluster.")
-	exporterCmd.Flags().IntVar(&registryConcurrency, "registry-concurrency", 10, "Maximum number of concurrent requests per registry. Set to 0 to disable.")
-	exporterCmd.Flags().Float64Var(&registryRPS, "registry-rps", 5, "Maximum requests per second per registry. Set to 0 to disable.")
-	exporterCmd.Flags().DurationVar(&registryTimeout, "registry-timeout", 30*time.Second, "Per-image timeout for registry requests. Set to 0 to disable.")
-	exporterCmd.Flags().StringVar(&installNamespace, "install-namespace", "", "Namespace the exporter is installed in. Used to look up the Secrets named via --image-pull-secret. The Helm chart sets this automatically to the release namespace.")
-	exporterCmd.Flags().StringArrayVar(&namespaces, "namespaces", nil, "Namespaces to watch (can be specified multiple times). Watches all namespaces if not set.")
-	exporterCmd.Flags().StringArrayVar(&annotationAllowlist, "annotation-allowlist", nil, "Annotation keys to include in container_image_annotation metrics (can be specified multiple times). Emits all annotations if not set.")
-	exporterCmd.Flags().StringArrayVar(&labelAllowlist, "label-allowlist", nil, "Label keys to include in container_image_label metrics (can be specified multiple times). Emits all labels if not set.")
-	exporterCmd.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Pull secrets to use as registry credentials. Must be provided with --install-namespace, which specifies the namespace the secrets are installed in.")
+	clusterExporterCmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	clusterExporterCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	clusterExporterCmd.Flags().StringVar(&platform, "platform", "", "The default platform to resolve multi-arch images to. Defaults to the platform the exporter is running on.")
+	clusterExporterCmd.Flags().DurationVar(&cacheDuration, "cache-duration", 1*time.Hour, "How long to cache image details for before querying the registry again.")
+	clusterExporterCmd.Flags().BoolVar(&k8sKeychain, "k8s-keychain", false, "Whether to fetch credentials from pulls secrets in the cluster.")
+	clusterExporterCmd.Flags().IntVar(&registryConcurrency, "registry-concurrency", 10, "Maximum number of concurrent requests per registry. Set to 0 to disable.")
+	clusterExporterCmd.Flags().Float64Var(&registryRPS, "registry-rps", 5, "Maximum requests per second per registry. Set to 0 to disable.")
+	clusterExporterCmd.Flags().DurationVar(&registryTimeout, "registry-timeout", 30*time.Second, "Per-image timeout for registry requests. Set to 0 to disable.")
+	clusterExporterCmd.Flags().StringVar(&installNamespace, "install-namespace", "", "Namespace the exporter is installed in. Used to look up the Secrets named via --image-pull-secret. The Helm chart sets this automatically to the release namespace.")
+	clusterExporterCmd.Flags().StringArrayVar(&namespaces, "namespaces", nil, "Namespaces to watch (can be specified multiple times). Watches all namespaces if not set.")
+	clusterExporterCmd.Flags().StringArrayVar(&annotationAllowlist, "annotation-allowlist", nil, "Annotation keys to include in container_image_cluster_annotation metrics (can be specified multiple times). Emits all annotations if not set.")
+	clusterExporterCmd.Flags().StringArrayVar(&labelAllowlist, "label-allowlist", nil, "Label keys to include in container_image_cluster_label metrics (can be specified multiple times). Emits all labels if not set.")
+	clusterExporterCmd.Flags().StringArrayVar(&imagePullSecrets, "image-pull-secret", nil, "Pull secrets to use as registry credentials. Must be provided with --install-namespace, which specifies the namespace the secrets are installed in.")
 }

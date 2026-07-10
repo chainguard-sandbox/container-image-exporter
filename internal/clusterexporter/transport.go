@@ -1,4 +1,4 @@
-package exporter
+package clusterexporter
 
 import (
 	"net/http"
@@ -112,13 +112,13 @@ type metricsTransport struct {
 func newMetricsTransport(base http.RoundTripper, reg prometheus.Registerer) *metricsTransport {
 	requests := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "container_image",
-		Subsystem: "registry",
+		Subsystem: "cluster_exporter_registry",
 		Name:      "requests_total",
 		Help:      "Count of HTTP requests issued to container registries, labelled by host, HTTP method, and response code (\"0\" when no response was received).",
 	}, []string{"host", "method", "code"})
 	duration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "container_image",
-		Subsystem: "registry",
+		Subsystem: "cluster_exporter_registry",
 		Name:      "request_duration_seconds",
 		Help:      "Latency of HTTP requests to container registries, labelled by host, HTTP method, and response code.",
 	}, []string{"host", "method", "code"})

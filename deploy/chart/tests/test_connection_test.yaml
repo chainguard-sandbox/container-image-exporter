@@ -26,7 +26,7 @@ tests:
 
   - it: metricsPort is used in the probe URL
     set:
-      exporter.metricsPort: 9090
+      clusterExporter.metricsPort: 9090
     asserts:
       - matchRegex:
           path: spec.containers[0].args[1]
@@ -42,9 +42,9 @@ tests:
           content:
             name: my-secret
 
-  - it: is omitted when exporter.enabled is false
+  - it: is omitted when clusterExporter.enabled is false
     set:
-      exporter.enabled: false
+      clusterExporter.enabled: false
     asserts:
       - hasDocuments:
           count: 0

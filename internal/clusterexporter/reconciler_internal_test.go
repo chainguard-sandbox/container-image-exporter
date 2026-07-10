@@ -1,4 +1,4 @@
-package exporter
+package clusterexporter
 
 import (
 	"testing"

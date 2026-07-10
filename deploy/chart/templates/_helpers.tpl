@@ -48,29 +48,36 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Exporter selector labels
+Cluster exporter fully qualified name
 */}}
-{{- define "container-image-exporter.exporter.selectorLabels" -}}
+{{- define "container-image-exporter.clusterExporter.fullname" -}}
+{{- printf "%s-cluster-exporter" (include "container-image-exporter.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Cluster exporter selector labels
+*/}}
+{{- define "container-image-exporter.clusterExporter.selectorLabels" -}}
 {{ include "container-image-exporter.selectorLabels" . }}
-app.kubernetes.io/component: exporter
+app.kubernetes.io/component: cluster-exporter
 {{- end }}
 
 {{/*
-Exporter common labels (includes component label)
+Cluster exporter common labels (includes component label)
 */}}
-{{- define "container-image-exporter.exporter.labels" -}}
+{{- define "container-image-exporter.clusterExporter.labels" -}}
 {{ include "container-image-exporter.labels" . }}
-app.kubernetes.io/component: exporter
+app.kubernetes.io/component: cluster-exporter
 {{- end }}
 
 {{/*
-Create the name of the exporter service account to use
+Create the name of the cluster exporter service account to use
 */}}
-{{- define "container-image-exporter.serviceAccountName" -}}
-{{- if .Values.exporter.serviceAccount.create }}
-{{- default (include "container-image-exporter.fullname" .) .Values.exporter.serviceAccount.name }}
+{{- define "container-image-exporter.clusterExporter.serviceAccountName" -}}
+{{- if .Values.clusterExporter.serviceAccount.create }}
+{{- default (include "container-image-exporter.clusterExporter.fullname" .) .Values.clusterExporter.serviceAccount.name }}
 {{- else }}
-{{- default "default" .Values.exporter.serviceAccount.name }}
+{{- default "default" .Values.clusterExporter.serviceAccount.name }}
 {{- end }}
 {{- end }}
 

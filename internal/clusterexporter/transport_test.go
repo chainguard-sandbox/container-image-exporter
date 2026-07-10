@@ -1,4 +1,4 @@
-package exporter
+package clusterexporter
 
 import (
 	"errors"
@@ -175,9 +175,9 @@ func TestMetricsTransport(t *testing.T) {
 		t.Fatalf("Gather: %v", err)
 	}
 
-	counter := findFamily(mfs, "container_image_registry_requests_total")
+	counter := findFamily(mfs, "container_image_cluster_exporter_registry_requests_total")
 	if counter == nil {
-		t.Fatal("container_image_registry_requests_total not registered")
+		t.Fatal("container_image_cluster_exporter_registry_requests_total not registered")
 	}
 	for _, want := range []map[string]string{
 		{"host": "registry.example.com", "method": "GET", "code": "200"},
@@ -194,9 +194,9 @@ func TestMetricsTransport(t *testing.T) {
 		}
 	}
 
-	hist := findFamily(mfs, "container_image_registry_request_duration_seconds")
+	hist := findFamily(mfs, "container_image_cluster_exporter_registry_request_duration_seconds")
 	if hist == nil {
-		t.Fatal("container_image_registry_request_duration_seconds not registered")
+		t.Fatal("container_image_cluster_exporter_registry_request_duration_seconds not registered")
 	}
 	if got, want := len(hist.GetMetric()), 3; got != want {
 		t.Errorf("histogram series count = %d, want %d", got, want)
@@ -226,7 +226,7 @@ func TestNewRegistryTransport_Composition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Gather: %v", err)
 	}
-	if findFamily(mfs, "container_image_registry_requests_total") == nil {
+	if findFamily(mfs, "container_image_cluster_exporter_registry_requests_total") == nil {
 		t.Error("composed transport did not register the metrics layer")
 	}
 }

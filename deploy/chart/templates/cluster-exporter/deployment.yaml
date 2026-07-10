@@ -1,25 +1,25 @@
-{{- if .Values.exporter.enabled }}
+{{- if .Values.clusterExporter.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "container-image-exporter.fullname" . }}
+  name: {{ include "container-image-exporter.clusterExporter.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "container-image-exporter.exporter.labels" . | nindent 4 }}
+    {{- include "container-image-exporter.clusterExporter.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.exporter.replicaCount }}
+  replicas: {{ .Values.clusterExporter.replicaCount }}
   selector:
     matchLabels:
-      {{- include "container-image-exporter.exporter.selectorLabels" . | nindent 6 }}
+      {{- include "container-image-exporter.clusterExporter.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.exporter.podAnnotations }}
+      {{- with .Values.clusterExporter.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "container-image-exporter.exporter.labels" . | nindent 8 }}
-        {{- with .Values.exporter.podLabels }}
+        {{- include "container-image-exporter.clusterExporter.labels" . | nindent 8 }}
+        {{- with .Values.clusterExporter.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
@@ -27,60 +27,60 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "container-image-exporter.serviceAccountName" . }}
-      {{- with .Values.exporter.podSecurityContext }}
+      serviceAccountName: {{ include "container-image-exporter.clusterExporter.serviceAccountName" . }}
+      {{- with .Values.clusterExporter.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: exporter
-          {{- with .Values.exporter.securityContext }}
+        - name: cluster-exporter
+          {{- with .Values.clusterExporter.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           image: "{{ required "image.repository is required" .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - exporter
-            - --metrics-bind-address=:{{ .Values.exporter.metricsPort }}
-            - --health-probe-bind-address=:{{ .Values.exporter.healthPort }}
-            - --k8s-keychain={{ .Values.exporter.k8sKeychain }}
-            - --platform={{ .Values.exporter.platform }}
-            - --cache-duration={{ .Values.exporter.cacheDuration }}
-            - --registry-concurrency={{ .Values.exporter.registryConcurrency }}
-            - --registry-rps={{ .Values.exporter.registryRps }}
-            - --registry-timeout={{ .Values.exporter.registryTimeout }}
+            - cluster-exporter
+            - --metrics-bind-address=:{{ .Values.clusterExporter.metricsPort }}
+            - --health-probe-bind-address=:{{ .Values.clusterExporter.healthPort }}
+            - --k8s-keychain={{ .Values.clusterExporter.k8sKeychain }}
+            - --platform={{ .Values.clusterExporter.platform }}
+            - --cache-duration={{ .Values.clusterExporter.cacheDuration }}
+            - --registry-concurrency={{ .Values.clusterExporter.registryConcurrency }}
+            - --registry-rps={{ .Values.clusterExporter.registryRps }}
+            - --registry-timeout={{ .Values.clusterExporter.registryTimeout }}
             # Always set so --image-pull-secret can look up Secrets in the
             # release namespace. Harmless when --image-pull-secret is unset.
             - --install-namespace={{ .Release.Namespace }}
-            {{- range .Values.exporter.namespaces }}
+            {{- range .Values.clusterExporter.namespaces }}
             - --namespaces={{ . }}
             {{- end }}
-            {{- range .Values.exporter.annotationAllowlist }}
+            {{- range .Values.clusterExporter.annotationAllowlist }}
             - --annotation-allowlist={{ . }}
             {{- end }}
-            {{- range .Values.exporter.labelAllowlist }}
+            {{- range .Values.clusterExporter.labelAllowlist }}
             - --label-allowlist={{ . }}
             {{- end }}
-            {{- range .Values.exporter.imagePullSecrets }}
+            {{- range .Values.clusterExporter.imagePullSecrets }}
             - --image-pull-secret={{ . }}
             {{- end }}
           ports:
             - name: metrics
-              containerPort: {{ .Values.exporter.metricsPort }}
+              containerPort: {{ .Values.clusterExporter.metricsPort }}
               protocol: TCP
             - name: health
-              containerPort: {{ .Values.exporter.healthPort }}
+              containerPort: {{ .Values.clusterExporter.healthPort }}
               protocol: TCP
-          {{- with .Values.exporter.livenessProbe }}
+          {{- with .Values.clusterExporter.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.exporter.readinessProbe }}
+          {{- with .Values.clusterExporter.readinessProbe }}
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.exporter.resources }}
+          {{- with .Values.clusterExporter.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -90,24 +90,24 @@ spec:
             # don't mount it as a writable volume.
             - name: ecr-cache
               mountPath: /home/nonroot/.ecr
-            {{- with .Values.exporter.volumeMounts }}
+            {{- with .Values.clusterExporter.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
       volumes:
         - name: ecr-cache
           emptyDir: {}
-        {{- with .Values.exporter.volumes }}
+        {{- with .Values.clusterExporter.volumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.exporter.nodeSelector }}
+      {{- with .Values.clusterExporter.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.exporter.affinity }}
+      {{- with .Values.clusterExporter.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.exporter.tolerations }}
+      {{- with .Values.clusterExporter.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
