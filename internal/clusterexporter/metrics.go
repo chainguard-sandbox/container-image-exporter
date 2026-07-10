@@ -1,4 +1,4 @@
-package exporter
+package clusterexporter
 
 import (
 	"context"
@@ -12,47 +12,49 @@ import (
 )
 
 const (
-	namespace = "container_image"
+	namespace         = "container_image"
+	dataSubsystem     = "cluster"
+	exporterSubsystem = "cluster_exporter"
 )
 
 var (
 	metricUp = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "up"),
+		prometheus.BuildFQName(namespace, exporterSubsystem, "up"),
 		"1 if the last metrics collection completed successfully (all resource types listed), 0 otherwise.",
 		nil, nil,
 	)
 	metricContainerInfo = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "container_info"),
-		"Info about containers running in the cluster, including the image digest resolved by the exporter.",
+		prometheus.BuildFQName(namespace, dataSubsystem, "container_info"),
+		"Info about containers running in the cluster, including the image digest resolved by the cluster-exporter.",
 		[]string{"group", "version", "kind", "namespace", "name", "jsonpath", "image", "digest"}, nil,
 	)
 	metricAnnotation = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "annotation"),
+		prometheus.BuildFQName(namespace, dataSubsystem, "annotation"),
 		"Annotations from the image manifest.",
 		[]string{"digest", "key", "value"}, nil,
 	)
 	metricLabel = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "label"),
+		prometheus.BuildFQName(namespace, dataSubsystem, "label"),
 		"Labels from the image config.",
 		[]string{"digest", "key", "value"}, nil,
 	)
 	metricSize = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "size_bytes"),
+		prometheus.BuildFQName(namespace, dataSubsystem, "size_bytes"),
 		"The size of the image in the registry.",
 		[]string{"digest"}, nil,
 	)
 	metricCreated = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "created"),
+		prometheus.BuildFQName(namespace, dataSubsystem, "created"),
 		"The created date from the image config. Expressed as a Unix Epoch Time.",
 		[]string{"digest"}, nil,
 	)
 	metricCacheOldestEntry = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "cache_oldest_entry_timestamp"),
-		"Unix timestamp of the oldest entry in the image cache. The zero value of time.Time (a large negative number) indicates the cache is empty. Use with container_image_cache_duration_seconds to detect stale caches: (time() - container_image_cache_oldest_entry_timestamp) > container_image_cache_duration_seconds.",
+		prometheus.BuildFQName(namespace, exporterSubsystem, "cache_oldest_entry_timestamp"),
+		"Unix timestamp of the oldest entry in the image cache. The zero value of time.Time (a large negative number) indicates the cache is empty. Use with container_image_cluster_exporter_cache_duration_seconds to detect stale caches: (time() - container_image_cluster_exporter_cache_oldest_entry_timestamp) > container_image_cluster_exporter_cache_duration_seconds.",
 		nil, nil,
 	)
 	metricCacheDuration = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "cache_duration_seconds"),
+		prometheus.BuildFQName(namespace, exporterSubsystem, "cache_duration_seconds"),
 		"Configured cache duration in seconds.",
 		nil, nil,
 	)
@@ -208,7 +210,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	// Emit cache staleness metrics. The oldest entry timestamp combined with
 	// the cache duration allows alerting on stuck reconcilers:
-	//   (time() - container_image_cache_oldest_entry_timestamp) > container_image_cache_duration_seconds
+	//   (time() - container_image_cluster_exporter_cache_oldest_entry_timestamp) > container_image_cluster_exporter_cache_duration_seconds
 	ch <- prometheus.MustNewConstMetric(
 		metricCacheOldestEntry, prometheus.GaugeValue, float64(oldestEntry.Unix()),
 	)

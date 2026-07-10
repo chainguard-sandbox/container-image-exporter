@@ -5,8 +5,8 @@ release:
 set:
   image.repository: foo
 tests:
-  - it: exporter service exposes only the metrics port
-    template: templates/exporter/service.yaml
+  - it: cluster-exporter service exposes only the metrics port
+    template: templates/cluster-exporter/service.yaml
     asserts:
       - isKind:
           of: Service
@@ -39,7 +39,7 @@ tests:
           value: None
 
   - it: scrapeAnnotations=true renders prometheus.io annotations (default)
-    template: templates/exporter/service.yaml
+    template: templates/cluster-exporter/service.yaml
     asserts:
       - equal:
           path: metadata.annotations["prometheus.io/scrape"]
@@ -52,9 +52,9 @@ tests:
           value: /metrics
 
   - it: scrapeAnnotations=false removes prometheus.io annotations
-    template: templates/exporter/service.yaml
+    template: templates/cluster-exporter/service.yaml
     set:
-      exporter.service.scrapeAnnotations: false
+      clusterExporter.service.scrapeAnnotations: false
     asserts:
       - notExists:
           path: metadata.annotations["prometheus.io/scrape"]
@@ -62,9 +62,9 @@ tests:
           path: metadata.annotations["prometheus.io/port"]
 
   - it: user-supplied service.annotations merge in
-    template: templates/exporter/service.yaml
+    template: templates/cluster-exporter/service.yaml
     set:
-      exporter.service.annotations:
+      clusterExporter.service.annotations:
         my-annotation: my-value
     asserts:
       - equal:
@@ -74,21 +74,21 @@ tests:
           path: metadata.annotations["prometheus.io/scrape"]
           value: "true"
 
-  - it: exporter service type can be overridden
-    template: templates/exporter/service.yaml
+  - it: cluster-exporter service type can be overridden
+    template: templates/cluster-exporter/service.yaml
     set:
-      exporter.service.type: NodePort
+      clusterExporter.service.type: NodePort
     asserts:
       - equal:
           path: spec.type
           value: NodePort
 
-  - it: exporter service carries component=exporter label
-    template: templates/exporter/service.yaml
+  - it: cluster-exporter service carries component=cluster-exporter label
+    template: templates/cluster-exporter/service.yaml
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/component"]
-          value: exporter
+          value: cluster-exporter
 
   - it: node-exporter service carries component=node-exporter label
     template: templates/node-exporter/service.yaml

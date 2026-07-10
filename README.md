@@ -48,7 +48,7 @@ graph TB
     style PROC fill:#ffe1e1
 ```
 
-### Exporter ([docs](./docs/exporter.md))
+### Cluster Exporter ([docs](./docs/cluster-exporter.md))
 
 A cluster-wide Deployment that watches Kubernetes resources and fetches image
 metadata from remote registries.
@@ -123,18 +123,14 @@ Both components are enabled by default. To deploy only one of them:
 # Disable the node-exporter Daemonset
 --set nodeExporter.enabled=false
 
-# Or, disable the exporter Deployment
---set exporter.enabled=false
+# Or, disable the cluster-exporter Deployment
+--set clusterExporter.enabled=false
 ```
-
-See the [exporter documentation](./docs/exporter.md#credentials) for
-instructions on how to configure registry credentials for the exporter
-component.
 
 If you are using the Prometheus Operator, enable the ServiceMonitors:
 
 ```
---set exporter.serviceMonitor.enabled=true \
+--set clusterExporter.serviceMonitor.enabled=true \
 --set nodeExporter.serviceMonitor.enabled=true
 ```
 
@@ -156,7 +152,7 @@ prometheus.io/path: "/metrics"
 ## Dashboards
 
 See [dashboards](./deploy/chart/dashboards) for examples of Grafana dashboards
-that consume the exporter's metrics.
+that consume the exporters' metrics.
 
 ## Development
 

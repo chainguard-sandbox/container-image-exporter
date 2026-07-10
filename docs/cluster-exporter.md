@@ -1,4 +1,4 @@
-# Exporter
+# Cluster Exporter
 
 A cluster-wide Deployment that watches Kubernetes resources and fetches image
 metadata from remote registries.
@@ -57,7 +57,7 @@ make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
 docker push your.registry/container-image-exporter:latest
 ```
 
-To deploy only the exporter (with the node-exporter DaemonSet disabled):
+To deploy only the cluster-exporter (with the node-exporter DaemonSet disabled):
 
 ```
 helm install container-image-exporter ./deploy/chart \
@@ -68,10 +68,13 @@ helm install container-image-exporter ./deploy/chart \
     --set nodeExporter.enabled=false
 ```
 
+To fetch metadata from privately hosted images, the exporter needs registry
+credentials — see [Credentials](#credentials) for the available options.
+
 If you are using the Prometheus Operator, enable the ServiceMonitor:
 
 ```
---set exporter.serviceMonitor.enabled=true
+--set clusterExporter.serviceMonitor.enabled=true
 ```
 
 If you are using Grafana (via kube-prometheus-stack), enable automatic
@@ -88,15 +91,15 @@ more details.
 
 | Metric                          | Description                                                                                            | Labels                                                         |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| container_image_container_info  | Details about containers running in the cluster, including the image digest resolved by the exporter.  | group, version, kind, namespace, name, jsonpath, image, digest |
-| container_image_annotation      | Annotations from the image manifest.                                                                   | digest, key, value                                             |
-| container_image_label           | Labels from the image config.                                                                          | digest, key, value                                             |
-| container_image_size_bytes      | The size of the image in the registry.                                                                 | digest                                                         |
-| container_image_created         | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
-| container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
-| container_image_registry_requests_total | Count of HTTP requests issued to container registries. `code="0"` indicates a transport-level error (no HTTP response). | host, method, code                                             |
-| container_image_registry_request_duration_seconds | Histogram of HTTP request latency to container registries.                                  | host, method, code                                             |
-| container_image_exporter_build_info | Always 1; labels carry the build version, git commit, and Go runtime version.                       | version, commit, goversion                                     |
+| container_image_cluster_container_info  | Details about containers running in the cluster, including the image digest resolved by the exporter.  | group, version, kind, namespace, name, jsonpath, image, digest |
+| container_image_cluster_annotation      | Annotations from the image manifest.                                                                   | digest, key, value                                             |
+| container_image_cluster_label           | Labels from the image config.                                                                          | digest, key, value                                             |
+| container_image_cluster_size_bytes      | The size of the image in the registry.                                                                 | digest                                                         |
+| container_image_cluster_created         | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
+| container_image_cluster_exporter_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
+| container_image_cluster_exporter_registry_requests_total | Count of HTTP requests issued to container registries. `code="0"` indicates a transport-level error (no HTTP response). | host, method, code                                             |
+| container_image_cluster_exporter_registry_request_duration_seconds | Histogram of HTTP request latency to container registries.                                  | host, method, code                                             |
+| container_image_cluster_exporter_build_info | Always 1; labels carry the build version, git commit, and Go runtime version.                       | version, commit, goversion                                     |
 
 ## Example Queries
 
@@ -117,19 +120,19 @@ using Chainguard images or images based on Chainguard.
 ```
   (
       count(
-        container_image_container_info{kind!="Pod"}
+        container_image_cluster_container_info{kind!="Pod"}
         * on (digest) group_left
           count by (digest) (
-              container_image_label{key="dev.chainguard.image.title"}
+              container_image_cluster_label{key="dev.chainguard.image.title"}
             or
-              container_image_label{key="dev.chainguard.package.main"}
+              container_image_cluster_label{key="dev.chainguard.package.main"}
             or
-              container_image_label{key="org.opencontainers.image.vendor", value="Chainguard"}
+              container_image_cluster_label{key="org.opencontainers.image.vendor", value="Chainguard"}
           )
       )
     /
       count(
-        container_image_container_info{kind!="Pod"}
+        container_image_cluster_container_info{kind!="Pod"}
       )
   )
 *
@@ -149,7 +152,7 @@ that run 100s of pods versus a StatefulSet that runs a handful.
 Frequently rebuilding your images from up to date base images is an effective
 way to ensure you are incorporating CVE fixes.
 
-You can use `container_image_created` to identify images that weren't built
+You can use `container_image_cluster_created` to identify images that weren't built
 recently.
 
 For instance, this query returns series for images that were created more than
@@ -159,9 +162,9 @@ For instance, this query returns series for images that were created more than
     time()
   -
     (
-        max by (digest, image) (container_image_container_info)
+        max by (digest, image) (container_image_cluster_container_info)
       * on (digest) group_left ()
-        container_image_created
+        container_image_cluster_created
     )
 >
   86400 * 14
@@ -193,8 +196,8 @@ Create pull secrets in the release namespace and reference them by name. The
 exporter looks them up in the namespace the chart is installed into.
 
 ```
---set 'exporter.imagePullSecrets[0]=my-registry' \
---set 'exporter.imagePullSecrets[1]=other-registry'
+--set 'clusterExporter.imagePullSecrets[0]=my-registry' \
+--set 'clusterExporter.imagePullSecrets[1]=other-registry'
 ```
 
 #### Cluster Wide Pull Secrets
@@ -204,7 +207,7 @@ pull secrets configured for the target resources in the same way the kubelet
 does. Requires cluster-wide access to Secrets and ServiceAccounts.
 
 ```
---set exporter.k8sKeychain=true
+--set clusterExporter.k8sKeychain=true
 ```
 
 ### Cache Duration
@@ -214,7 +217,7 @@ caches the response for each image for a configurable amount of time. The
 default is 1 hour.
 
 ```
---set exporter.cacheDuration=6h
+--set clusterExporter.cacheDuration=6h
 ```
 
 ### Multi-Architecture Images
@@ -229,7 +232,7 @@ deployed to a node.
 Override the default platform with:
 
 ```
---set exporter.platform=linux/arm64
+--set clusterExporter.platform=linux/arm64
 ```
 
 ## Supported Resources
@@ -279,7 +282,7 @@ For example, to add Tekton, Knative, and Argo Workflows support, use the
 following values:
 
 ```yaml
-exporter:
+clusterExporter:
   rbac:
     extraRules:
       - apiGroups: ["tekton.dev"]

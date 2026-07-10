@@ -107,17 +107,17 @@ helm install container-image-exporter ./deploy/chart \
     --namespace "${DEMO_NAMESPACE}" --create-namespace \
     --set image.repository="${DEMO_IMAGE_REPO}" \
     --set image.tag="${DEMO_IMAGE_TAG}" \
-    --set exporter.serviceMonitor.enabled=true \
+    --set clusterExporter.serviceMonitor.enabled=true \
     --set nodeExporter.serviceMonitor.enabled=true \
     --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock \
     --set grafana.dashboards.enabled=true \
-    --set "exporter.volumes[0].name=docker-config" \
-    --set "exporter.volumes[0].secret.secretName=cgr-docker-config" \
-    --set "exporter.volumes[0].secret.items[0].key=.dockerconfigjson" \
-    --set "exporter.volumes[0].secret.items[0].path=config.json" \
-    --set "exporter.volumeMounts[0].name=docker-config" \
-    --set "exporter.volumeMounts[0].mountPath=/home/nonroot/.docker" \
-    --set "exporter.volumeMounts[0].readOnly=true" \
+    --set "clusterExporter.volumes[0].name=docker-config" \
+    --set "clusterExporter.volumes[0].secret.secretName=cgr-docker-config" \
+    --set "clusterExporter.volumes[0].secret.items[0].key=.dockerconfigjson" \
+    --set "clusterExporter.volumes[0].secret.items[0].path=config.json" \
+    --set "clusterExporter.volumeMounts[0].name=docker-config" \
+    --set "clusterExporter.volumeMounts[0].mountPath=/home/nonroot/.docker" \
+    --set "clusterExporter.volumeMounts[0].readOnly=true" \
     --wait --timeout=5m
 
 # ---------------------------------------------------------------------------

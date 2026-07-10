@@ -22,6 +22,6 @@ func Execute() {
 
 func init() {
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
-	rootCmd.AddCommand(exporterCmd)
+	rootCmd.AddCommand(clusterExporterCmd)
 	rootCmd.AddCommand(nodeExporterCmd)
 }

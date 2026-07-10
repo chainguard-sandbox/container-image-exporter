@@ -16,20 +16,20 @@ render() {
 
 render "default values"
 render "all components enabled + all optional features" \
-    --set exporter.serviceMonitor.enabled=true \
+    --set clusterExporter.serviceMonitor.enabled=true \
     --set nodeExporter.serviceMonitor.enabled=true \
     --set grafana.dashboards.enabled=true
-render "exporter disabled" --set exporter.enabled=false
+render "cluster-exporter disabled" --set clusterExporter.enabled=false
 render "node-exporter disabled" --set nodeExporter.enabled=false
 render "both components disabled" \
-    --set exporter.enabled=false \
+    --set clusterExporter.enabled=false \
     --set nodeExporter.enabled=false
-render "RBAC disabled" --set exporter.rbac.create=false
+render "RBAC disabled" --set clusterExporter.rbac.create=false
 render "service accounts not created" \
-    --set exporter.serviceAccount.create=false \
+    --set clusterExporter.serviceAccount.create=false \
     --set nodeExporter.serviceAccount.create=false
 render "imagePullSecrets configured" \
-    --set 'exporter.imagePullSecrets[0]=my-registry' \
-    --set 'exporter.imagePullSecrets[1]=other-registry'
+    --set 'clusterExporter.imagePullSecrets[0]=my-registry' \
+    --set 'clusterExporter.imagePullSecrets[1]=other-registry'
 
 echo "==> All lint checks passed"

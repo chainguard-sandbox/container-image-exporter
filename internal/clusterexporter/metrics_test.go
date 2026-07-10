@@ -1,4 +1,4 @@
-package exporter_test
+package clusterexporter_test
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
+	"github.com/chainguard-sandbox/container-image-exporter/internal/clusterexporter"
 )
 
 // --- helpers ---
@@ -227,7 +227,7 @@ func containerEntry(name, image string) map[string]interface{} {
 // setupAllowlistManager starts a manager with the given options and a dedicated
 // Prometheus registry. It returns a gather function that returns all
 // container_image_* metrics from it.
-func setupAllowlistManager(t *testing.T, opts ...exporter.Option) (gather func() map[string]*dto.MetricFamily) {
+func setupAllowlistManager(t *testing.T, opts ...clusterexporter.Option) (gather func() map[string]*dto.MetricFamily) {
 	t.Helper()
 
 	reg := prometheus.NewRegistry()
@@ -245,13 +245,13 @@ func setupAllowlistManager(t *testing.T, opts ...exporter.Option) (gather func()
 		t.Fatalf("creating manager: %v", err)
 	}
 
-	allOpts := append([]exporter.Option{
-		exporter.WithCacheDuration(5 * time.Minute),
-		exporter.WithK8sKeychain(false),
-		exporter.WithMetricsRegistry(reg),
+	allOpts := append([]clusterexporter.Option{
+		clusterexporter.WithCacheDuration(5 * time.Minute),
+		clusterexporter.WithK8sKeychain(false),
+		clusterexporter.WithMetricsRegistry(reg),
 	}, opts...)
 
-	if err := exporter.SetupControllers(mgr, allOpts...); err != nil {
+	if err := clusterexporter.SetupControllers(mgr, allOpts...); err != nil {
 		t.Fatalf("setting up controllers: %v", err)
 	}
 
@@ -279,7 +279,7 @@ func setupAllowlistManager(t *testing.T, opts ...exporter.Option) (gather func()
 
 // --- tests ---
 
-// TestExporter_ContainerInfo checks that container_image_container_info is
+// TestExporter_ContainerInfo checks that container_image_cluster_container_info is
 // emitted for each resource type with the correct kind, image, and digest labels.
 func TestExporter_ContainerInfo(t *testing.T) {
 	img := pushImage(t, "test/container-info", nil, nil, time.Time{})
@@ -527,7 +527,7 @@ func TestExporter_ContainerInfo(t *testing.T) {
 			}
 			t.Cleanup(func() { testK8sClient.Delete(testCtx, tt.obj) })
 
-			m := waitForMetric(t, "container_image_container_info", map[string]string{
+			m := waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 				"group":     tt.group,
 				"version":   tt.version,
 				"kind":      tt.kind,
@@ -561,13 +561,13 @@ func TestExporter_InitContainers(t *testing.T) {
 	}
 	t.Cleanup(func() { testK8sClient.Delete(testCtx, pod) })
 
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind":     "Pod",
 		"name":     "init-container-pod",
 		"jsonpath": "{.spec.containers[0]}",
 		"image":    main.ref,
 	})
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind":     "Pod",
 		"name":     "init-container-pod",
 		"jsonpath": "{.spec.initContainers[0]}",
@@ -601,7 +601,7 @@ func TestExporter_EphemeralContainers(t *testing.T) {
 		t.Fatalf("adding ephemeral container: %v", err)
 	}
 
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind":     "Pod",
 		"name":     "ephemeral-container-pod",
 		"jsonpath": "{.spec.ephemeralContainers[0]}",
@@ -625,12 +625,12 @@ func TestExporter_TektonSidecars(t *testing.T) {
 	}
 	t.Cleanup(func() { testK8sClient.Delete(testCtx, obj) })
 
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind":  "Task",
 		"name":  "sidecar-task",
 		"image": step.ref,
 	})
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind":  "Task",
 		"name":  "sidecar-task",
 		"image": sidecar.ref,
@@ -671,19 +671,19 @@ func TestExporter_ArgoTemplateTypes(t *testing.T) {
 	t.Cleanup(func() { testK8sClient.Delete(testCtx, obj) })
 
 	// container singleton
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind": "Workflow", "name": "argo-template-types", "image": containerImg.ref,
 	})
 	// script singleton (no name field on the container)
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind": "Workflow", "name": "argo-template-types", "image": scriptImg.ref,
 	})
 	// initContainers list
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind": "Workflow", "name": "argo-template-types", "image": initImg.ref,
 	})
 	// sidecars list
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind": "Workflow", "name": "argo-template-types", "image": sidecarImg.ref,
 	})
 }
@@ -712,10 +712,10 @@ func TestExporter_ImageMetrics(t *testing.T) {
 
 	// Config labels: wait for one to confirm reconciliation, then verify the
 	// exact set of keys emitted for this digest.
-	waitForMetric(t, "container_image_label", map[string]string{
+	waitForMetric(t, "container_image_cluster_label", map[string]string{
 		"digest": img.digest, "key": "org.example.team", "value": "platform",
 	})
-	assertLabelValueSet(t, gatherMetrics(t), "container_image_label",
+	assertLabelValueSet(t, gatherMetrics(t), "container_image_cluster_label",
 		map[string]string{"digest": img.digest},
 		"key",
 		map[string]struct{}{
@@ -725,12 +725,12 @@ func TestExporter_ImageMetrics(t *testing.T) {
 	)
 
 	// Manifest annotations: same pattern.
-	waitForMetric(t, "container_image_annotation", map[string]string{
+	waitForMetric(t, "container_image_cluster_annotation", map[string]string{
 		"digest": img.digest,
 		"key":    "org.opencontainers.image.source",
 		"value":  "https://github.com/example/repo",
 	})
-	assertLabelValueSet(t, gatherMetrics(t), "container_image_annotation",
+	assertLabelValueSet(t, gatherMetrics(t), "container_image_cluster_annotation",
 		map[string]string{"digest": img.digest},
 		"key",
 		map[string]struct{}{
@@ -739,15 +739,15 @@ func TestExporter_ImageMetrics(t *testing.T) {
 	)
 
 	// Creation time
-	m := waitForMetric(t, "container_image_created", map[string]string{"digest": img.digest})
+	m := waitForMetric(t, "container_image_cluster_created", map[string]string{"digest": img.digest})
 	if got, want := m.GetGauge().GetValue(), float64(createdAt.Unix()); got != want {
-		t.Errorf("container_image_created: got %v, want %v", got, want)
+		t.Errorf("container_image_cluster_created: got %v, want %v", got, want)
 	}
 
 	// Size should be positive
-	m = waitForMetric(t, "container_image_size_bytes", map[string]string{"digest": img.digest})
+	m = waitForMetric(t, "container_image_cluster_size_bytes", map[string]string{"digest": img.digest})
 	if m.GetGauge().GetValue() <= 0 {
-		t.Errorf("container_image_size_bytes: expected positive value, got %v", m.GetGauge().GetValue())
+		t.Errorf("container_image_cluster_size_bytes: expected positive value, got %v", m.GetGauge().GetValue())
 	}
 }
 
@@ -762,27 +762,27 @@ func TestExporter_CacheStaleness(t *testing.T) {
 	t.Cleanup(func() { testK8sClient.Delete(testCtx, deploy) })
 
 	// Wait for the image to be reconciled into the cache.
-	waitForMetric(t, "container_image_size_bytes", map[string]string{"digest": img.digest})
+	waitForMetric(t, "container_image_cluster_size_bytes", map[string]string{"digest": img.digest})
 
 	mfs := gatherMetrics(t)
 
-	// container_image_cache_duration_seconds should always be present and
+	// container_image_cluster_exporter_cache_duration_seconds should always be present and
 	// match the WithCacheDuration(5*time.Minute) configured in TestMain.
-	durationMF, ok := mfs["container_image_cache_duration_seconds"]
+	durationMF, ok := mfs["container_image_cluster_exporter_cache_duration_seconds"]
 	if !ok {
-		t.Fatal("container_image_cache_duration_seconds not found")
+		t.Fatal("container_image_cluster_exporter_cache_duration_seconds not found")
 	}
 	if got, want := durationMF.GetMetric()[0].GetGauge().GetValue(), (5 * time.Minute).Seconds(); got != want {
-		t.Errorf("container_image_cache_duration_seconds: got %v, want %v", got, want)
+		t.Errorf("container_image_cluster_exporter_cache_duration_seconds: got %v, want %v", got, want)
 	}
 
-	// container_image_cache_oldest_entry_timestamp should be present. All
+	// container_image_cluster_exporter_cache_oldest_entry_timestamp should be present. All
 	// tests share a global cache, so the oldest entry may predate this test,
 	// but it must fall within the last cacheDuration (5 minutes) — any older
 	// entry would have been refetched by the reconciler.
-	oldestMF, ok := mfs["container_image_cache_oldest_entry_timestamp"]
+	oldestMF, ok := mfs["container_image_cluster_exporter_cache_oldest_entry_timestamp"]
 	if !ok {
-		t.Fatal("container_image_cache_oldest_entry_timestamp not found")
+		t.Fatal("container_image_cluster_exporter_cache_oldest_entry_timestamp not found")
 	}
 	ts := time.Unix(int64(oldestMF.GetMetric()[0].GetGauge().GetValue()), 0)
 	cacheDuration := 5 * time.Minute
@@ -807,7 +807,7 @@ func TestExporter_CacheEviction(t *testing.T) {
 	t.Cleanup(func() { testK8sClient.Delete(testCtx, deploy) })
 
 	// Wait for the metric to appear
-	waitForMetric(t, "container_image_container_info", map[string]string{
+	waitForMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind":  "Deployment",
 		"name":  "cache-eviction-deploy",
 		"image": img.ref,
@@ -821,17 +821,17 @@ func TestExporter_CacheEviction(t *testing.T) {
 		t.Fatalf("deleting deployment: %v", err)
 	}
 
-	waitForNoMetric(t, "container_image_container_info", map[string]string{
+	waitForNoMetric(t, "container_image_cluster_container_info", map[string]string{
 		"kind": "Deployment",
 		"name": "cache-eviction-deploy",
 	})
-	waitForNoMetric(t, "container_image_size_bytes", map[string]string{
+	waitForNoMetric(t, "container_image_cluster_size_bytes", map[string]string{
 		"digest": img.digest,
 	})
 }
 
 // TestExporter_ContainerInfoBeforeCachePopulated verifies that
-// container_image_container_info is emitted with an empty digest label when
+// container_image_cluster_container_info is emitted with an empty digest label when
 // the image has not yet been fetched into the cache, and that the digest is
 // populated once the reconciler successfully retrieves the image.
 func TestExporter_ContainerInfoBeforeCachePopulated(t *testing.T) {
@@ -861,17 +861,17 @@ func TestExporter_ContainerInfoBeforeCachePopulated(t *testing.T) {
 	// the informer cache has synced) and emits container_info with digest="".
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_container_info", map[string]string{
+		if findMetric(gather(), "container_image_cluster_container_info", map[string]string{
 			"image": ref, "digest": "",
 		}) != nil {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_container_info", map[string]string{
+	if findMetric(gather(), "container_image_cluster_container_info", map[string]string{
 		"image": ref, "digest": "",
 	}) == nil {
-		t.Fatal("timed out waiting for container_image_container_info with empty digest")
+		t.Fatal("timed out waiting for container_image_cluster_container_info with empty digest")
 	}
 
 	// Now push the image. The reconciler retries failed reconciles via
@@ -882,17 +882,17 @@ func TestExporter_ContainerInfoBeforeCachePopulated(t *testing.T) {
 	// Wait for the digest to be populated in the metric.
 	deadline = time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_container_info", map[string]string{
+		if findMetric(gather(), "container_image_cluster_container_info", map[string]string{
 			"image": ref, "digest": img.digest,
 		}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_container_info", map[string]string{
+	if findMetric(gather(), "container_image_cluster_container_info", map[string]string{
 		"image": ref, "digest": img.digest,
 	}) == nil {
-		t.Errorf("timed out waiting for container_image_container_info with digest %s", img.digest)
+		t.Errorf("timed out waiting for container_image_cluster_container_info with digest %s", img.digest)
 	}
 }
 
@@ -909,7 +909,7 @@ func TestAnnotationAllowlist(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		exporter.WithAnnotationAllowlist([]string{"org.example.allowed"}),
+		clusterexporter.WithAnnotationAllowlist([]string{"org.example.allowed"}),
 	)
 
 	deploy := &appsv1.Deployment{
@@ -930,21 +930,21 @@ func TestAnnotationAllowlist(t *testing.T) {
 	// Wait until the allowed annotation appears.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_annotation", map[string]string{
+		if findMetric(gather(), "container_image_cluster_annotation", map[string]string{
 			"digest": img.digest, "key": "org.example.allowed",
 		}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_annotation", map[string]string{
+	if findMetric(gather(), "container_image_cluster_annotation", map[string]string{
 		"digest": img.digest, "key": "org.example.allowed",
 	}) == nil {
 		t.Fatal("timed out waiting for allowed annotation metric")
 	}
 
 	// The non-allowed key must not appear.
-	if findMetric(gather(), "container_image_annotation", map[string]string{
+	if findMetric(gather(), "container_image_cluster_annotation", map[string]string{
 		"digest": img.digest, "key": "org.example.not-allowed",
 	}) != nil {
 		t.Error("unexpected annotation metric for non-allowed key org.example.not-allowed")
@@ -964,7 +964,7 @@ func TestLabelAllowlist(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		exporter.WithLabelAllowlist([]string{"org.example.allowed"}),
+		clusterexporter.WithLabelAllowlist([]string{"org.example.allowed"}),
 	)
 
 	deploy := &appsv1.Deployment{
@@ -985,21 +985,21 @@ func TestLabelAllowlist(t *testing.T) {
 	// Wait until the allowed label appears.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_label", map[string]string{
+		if findMetric(gather(), "container_image_cluster_label", map[string]string{
 			"digest": img.digest, "key": "org.example.allowed",
 		}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_label", map[string]string{
+	if findMetric(gather(), "container_image_cluster_label", map[string]string{
 		"digest": img.digest, "key": "org.example.allowed",
 	}) == nil {
 		t.Fatal("timed out waiting for allowed label metric")
 	}
 
 	// The non-allowed key must not appear.
-	if findMetric(gather(), "container_image_label", map[string]string{
+	if findMetric(gather(), "container_image_cluster_label", map[string]string{
 		"digest": img.digest, "key": "org.example.not-allowed",
 	}) != nil {
 		t.Error("unexpected label metric for non-allowed key org.example.not-allowed")
@@ -1020,7 +1020,7 @@ func TestAnnotationAllowlistMultipleKeys(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		exporter.WithAnnotationAllowlist([]string{"org.example.first", "org.example.second"}),
+		clusterexporter.WithAnnotationAllowlist([]string{"org.example.first", "org.example.second"}),
 	)
 
 	deploy := &appsv1.Deployment{
@@ -1042,14 +1042,14 @@ func TestAnnotationAllowlistMultipleKeys(t *testing.T) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		mfs := gather()
-		if findMetric(mfs, "container_image_annotation", map[string]string{"digest": img.digest, "key": "org.example.first"}) != nil &&
-			findMetric(mfs, "container_image_annotation", map[string]string{"digest": img.digest, "key": "org.example.second"}) != nil {
+		if findMetric(mfs, "container_image_cluster_annotation", map[string]string{"digest": img.digest, "key": "org.example.first"}) != nil &&
+			findMetric(mfs, "container_image_cluster_annotation", map[string]string{"digest": img.digest, "key": "org.example.second"}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
 
-	assertLabelValueSet(t, gather(), "container_image_annotation",
+	assertLabelValueSet(t, gather(), "container_image_cluster_annotation",
 		map[string]string{"digest": img.digest},
 		"key",
 		map[string]struct{}{"org.example.first": {}, "org.example.second": {}},
@@ -1070,7 +1070,7 @@ func TestLabelAllowlistMultipleKeys(t *testing.T) {
 	)
 
 	gather := setupAllowlistManager(t,
-		exporter.WithLabelAllowlist([]string{"org.example.first", "org.example.second"}),
+		clusterexporter.WithLabelAllowlist([]string{"org.example.first", "org.example.second"}),
 	)
 
 	deploy := &appsv1.Deployment{
@@ -1092,14 +1092,14 @@ func TestLabelAllowlistMultipleKeys(t *testing.T) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		mfs := gather()
-		if findMetric(mfs, "container_image_label", map[string]string{"digest": img.digest, "key": "org.example.first"}) != nil &&
-			findMetric(mfs, "container_image_label", map[string]string{"digest": img.digest, "key": "org.example.second"}) != nil {
+		if findMetric(mfs, "container_image_cluster_label", map[string]string{"digest": img.digest, "key": "org.example.first"}) != nil &&
+			findMetric(mfs, "container_image_cluster_label", map[string]string{"digest": img.digest, "key": "org.example.second"}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
 
-	assertLabelValueSet(t, gather(), "container_image_label",
+	assertLabelValueSet(t, gather(), "container_image_cluster_label",
 		map[string]string{"digest": img.digest},
 		"key",
 		map[string]struct{}{"org.example.first": {}, "org.example.second": {}},

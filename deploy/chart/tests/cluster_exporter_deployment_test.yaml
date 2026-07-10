@@ -1,6 +1,6 @@
-suite: exporter deployment
+suite: cluster-exporter deployment
 templates:
-  - templates/exporter/deployment.yaml
+  - templates/cluster-exporter/deployment.yaml
 release:
   name: cie
 set:
@@ -14,11 +14,11 @@ tests:
           of: Deployment
       - equal:
           path: metadata.name
-          value: cie-container-image-exporter
+          value: cie-container-image-exporter-cluster-exporter
 
-  - it: is omitted when exporter.enabled is false
+  - it: is omitted when clusterExporter.enabled is false
     set:
-      exporter.enabled: false
+      clusterExporter.enabled: false
     asserts:
       - hasDocuments:
           count: 0
@@ -54,7 +54,7 @@ tests:
 
   - it: metricsPort drives the metrics bind address and container port
     set:
-      exporter.metricsPort: 9090
+      clusterExporter.metricsPort: 9090
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -68,7 +68,7 @@ tests:
 
   - it: healthPort drives the health bind address and container port
     set:
-      exporter.healthPort: 9091
+      clusterExporter.healthPort: 9091
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -97,7 +97,7 @@ tests:
 
   - it: k8sKeychain=true renders the opt-in flag
     set:
-      exporter.k8sKeychain: true
+      clusterExporter.k8sKeychain: true
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -105,7 +105,7 @@ tests:
 
   - it: namespaces allowlist becomes repeated flags
     set:
-      exporter.namespaces:
+      clusterExporter.namespaces:
         - default
         - kube-system
     asserts:
@@ -124,7 +124,7 @@ tests:
 
   - it: registryTimeout override propagates
     set:
-      exporter.registryTimeout: 2m
+      clusterExporter.registryTimeout: 2m
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -132,7 +132,7 @@ tests:
 
   - it: imagePullSecrets become repeated --image-pull-secret flags
     set:
-      exporter.imagePullSecrets:
+      clusterExporter.imagePullSecrets:
         - my-registry
         - other-registry
     asserts:
@@ -165,13 +165,13 @@ tests:
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/component"]
-          value: exporter
+          value: cluster-exporter
       - equal:
           path: spec.template.metadata.labels["app.kubernetes.io/component"]
-          value: exporter
+          value: cluster-exporter
       - equal:
           path: spec.selector.matchLabels["app.kubernetes.io/component"]
-          value: exporter
+          value: cluster-exporter
 
   - it: always mounts an emptyDir at /home/nonroot/.ecr for the AWS credential helper
     asserts:
@@ -188,11 +188,11 @@ tests:
 
   - it: user-provided volumes and volumeMounts compose with the default ecr-cache
     set:
-      exporter.volumes:
+      clusterExporter.volumes:
         - name: docker-config
           secret:
             secretName: my-docker-config
-      exporter.volumeMounts:
+      clusterExporter.volumeMounts:
         - name: docker-config
           mountPath: /home/nonroot/.docker
           readOnly: true

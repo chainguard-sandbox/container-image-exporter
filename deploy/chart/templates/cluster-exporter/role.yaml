@@ -1,0 +1,29 @@
+{{- if and .Values.clusterExporter.enabled .Values.clusterExporter.rbac.create .Values.clusterExporter.imagePullSecrets }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "container-image-exporter.clusterExporter.fullname" . }}-image-pull-secrets
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.clusterExporter.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "container-image-exporter.clusterExporter.fullname" . }}-image-pull-secrets
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter.clusterExporter.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "container-image-exporter.clusterExporter.fullname" . }}-image-pull-secrets
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "container-image-exporter.clusterExporter.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -24,11 +24,11 @@ diagnose() {
     echo "==> Events (last 50, sorted by time):"
     kubectl get events -A --sort-by=.lastTimestamp 2>/dev/null | tail -50 || true
 
-    echo "==> Exporter pod describe:"
-    kubectl describe pod -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=exporter 2>&1 || true
+    echo "==> Cluster-exporter pod describe:"
+    kubectl describe pod -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=cluster-exporter 2>&1 || true
 
-    echo "==> Exporter logs (last 200):"
-    kubectl logs -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=exporter --tail=200 2>&1 || true
+    echo "==> Cluster-exporter logs (last 200):"
+    kubectl logs -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=cluster-exporter --tail=200 2>&1 || true
 
     echo "==> Node-exporter logs (last 100):"
     kubectl logs -n "${HELM_TEST_NAMESPACE}" -l app.kubernetes.io/component=node-exporter --tail=100 2>&1 || true
@@ -126,12 +126,12 @@ helm install container-image-exporter ./deploy/chart \
     --set image.repository="${HELM_TEST_IMAGE_NAME}" \
     --set image.tag="${HELM_TEST_IMAGE_TAG}" \
     --set image.pullPolicy=Never \
-    --set exporter.serviceMonitor.enabled=true \
+    --set clusterExporter.serviceMonitor.enabled=true \
     --set nodeExporter.serviceMonitor.enabled=true \
     --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock \
     --set grafana.dashboards.enabled=true
 
-echo "==> Waiting for exporter Deployment to be ready"
+echo "==> Waiting for cluster-exporter Deployment to be ready"
 kubectl rollout status deployment \
     -n "${HELM_TEST_NAMESPACE}" --timeout=2m
 
@@ -188,20 +188,23 @@ wait_for_query() {
     return 1
 }
 
-# Wait for both jobs to be scraped before checking individual metrics.
-wait_for_query "Prometheus has scraped at least one exporter target" \
-    'up{job="container-image-exporter"} == 1' 90
+# Wait for both services to be scraped before checking individual metrics.
+# Match on `service` (set by prometheus-operator's kubernetes_sd_config to the
+# k8s Service name); the `job` label's format depends on the prometheus-operator
+# version and is less stable.
+wait_for_query "Prometheus has scraped at least one cluster-exporter target" \
+    'up{service="container-image-exporter-cluster-exporter"} == 1' 90
 wait_for_query "Prometheus has scraped at least one node-exporter target" \
-    'up{job="container-image-exporter-node-exporter"} == 1' 90
+    'up{service="container-image-exporter-node-exporter"} == 1' 90
 
-wait_for_query "exporter up" 'container_image_up'
+wait_for_query "cluster-exporter up" 'container_image_cluster_exporter_up'
 wait_for_query "node-exporter up" 'container_image_node_exporter_up'
-wait_for_query "exporter build_info carries the build-arg VERSION and COMMIT" \
-    "container_image_exporter_build_info{version=\"${EXPECTED_VERSION}\",revision=\"${EXPECTED_COMMIT}\"}"
+wait_for_query "cluster-exporter build_info carries the build-arg VERSION and COMMIT" \
+    "container_image_cluster_exporter_build_info{version=\"${EXPECTED_VERSION}\",revision=\"${EXPECTED_COMMIT}\"}"
 wait_for_query "node-exporter build_info carries the build-arg VERSION and COMMIT" \
     "container_image_node_exporter_build_info{version=\"${EXPECTED_VERSION}\",revision=\"${EXPECTED_COMMIT}\"}"
-wait_for_query "exporter observed its own pod image" \
-    "container_image_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\"}"
+wait_for_query "cluster-exporter observed its own pod image" \
+    "container_image_cluster_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\"}"
 wait_for_query "node-exporter resolved wolfi os-release from /proc/<pid>/root" \
     "container_image_node_container_info{image=\"${HELM_TEST_IMAGE_NAME}:${HELM_TEST_IMAGE_TAG}\",os_id=\"wolfi\"}"
 wait_for_query "node-exporter parsed ${EXPECTED_LABEL_KEY} from the image config" \

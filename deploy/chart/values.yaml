@@ -8,7 +8,7 @@ image:
 
 imagePullSecrets: []
 
-exporter:
+clusterExporter:
   enabled: true
   replicaCount: 1
 
@@ -21,7 +21,7 @@ exporter:
   rbac:
     create: true
     # Additional ClusterRole rules appended to the defaults.
-    # Use this to grant the exporter access to CRDs it can auto-discover.
+    # Use this to grant the cluster-exporter access to CRDs it can auto-discover.
     # Examples for supported CRD groups:
     #
     # extraRules:
@@ -36,7 +36,7 @@ exporter:
     #     verbs: ["get", "list", "watch"]
     extraRules: []
 
-  # When true, the exporter uses the pull secrets configured for the target
+  # When true, the cluster-exporter uses the pull secrets configured for the target
   # resource as registry credentials. Requires cluster-wide access to Secrets
   # and ServiceAccounts.
   k8sKeychain: false
@@ -173,7 +173,7 @@ nodeExporter:
 
   serviceMonitor:
     enabled: false
-    # See exporter.serviceMonitor.additionalLabels above.
+    # See clusterExporter.serviceMonitor.additionalLabels above.
     additionalLabels: {}
 
   metricsPort: 8080
@@ -181,7 +181,7 @@ nodeExporter:
   service:
     clusterIP: None
     annotations: {}
-    # See exporter.service.scrapeAnnotations above.
+    # See clusterExporter.service.scrapeAnnotations above.
     scrapeAnnotations: true
 
   resources:

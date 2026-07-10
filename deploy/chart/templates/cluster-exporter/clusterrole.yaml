@@ -1,15 +1,15 @@
-{{- if and .Values.exporter.enabled .Values.exporter.rbac.create }}
+{{- if and .Values.clusterExporter.enabled .Values.clusterExporter.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "container-image-exporter.fullname" . }}
+  name: {{ include "container-image-exporter.clusterExporter.fullname" . }}
   labels:
-    {{- include "container-image-exporter.exporter.labels" . | nindent 4 }}
+    {{- include "container-image-exporter.clusterExporter.labels" . | nindent 4 }}
 rules:
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["get", "list", "watch"]
-{{- if .Values.exporter.k8sKeychain }}
+{{- if .Values.clusterExporter.k8sKeychain }}
 - apiGroups: [""]
   resources: ["secrets", "serviceaccounts"]
   verbs: ["get", "list"]
@@ -20,7 +20,7 @@ rules:
 - apiGroups: ["batch"]
   resources: ["jobs", "cronjobs"]
   verbs: ["get", "list", "watch"]
-{{- with .Values.exporter.rbac.extraRules }}
+{{- with .Values.clusterExporter.rbac.extraRules }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
 {{- end }}

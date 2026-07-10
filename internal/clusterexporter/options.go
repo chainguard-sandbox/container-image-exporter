@@ -1,4 +1,4 @@
-package exporter
+package clusterexporter
 
 import (
 	"time"
@@ -85,7 +85,7 @@ func WithMetricsRegistry(r prometheus.Registerer) Option {
 }
 
 // WithAnnotationAllowlist restricts which annotation keys are emitted as
-// container_image_annotation metrics. When empty (the default), all keys are
+// container_image_cluster_annotation metrics. When empty (the default), all keys are
 // emitted.
 func WithAnnotationAllowlist(keys []string) Option {
 	return func(o *options) {
@@ -94,7 +94,7 @@ func WithAnnotationAllowlist(keys []string) Option {
 }
 
 // WithLabelAllowlist restricts which label keys are emitted as
-// container_image_label metrics. When empty (the default), all keys are
+// container_image_cluster_label metrics. When empty (the default), all keys are
 // emitted.
 func WithLabelAllowlist(keys []string) Option {
 	return func(o *options) {

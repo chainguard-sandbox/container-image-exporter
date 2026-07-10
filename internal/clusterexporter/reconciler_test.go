@@ -1,4 +1,4 @@
-package exporter_test
+package clusterexporter_test
 
 import (
 	"context"
@@ -24,14 +24,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/chainguard-sandbox/container-image-exporter/internal/exporter"
+	"github.com/chainguard-sandbox/container-image-exporter/internal/clusterexporter"
 )
 
 // pushedIndex holds an OCI image index pushed to the test registry. The
 // reconciler stores the index digest (desc.Digest from remote.Get), not the
 // per-platform manifest digest. Creation times on the platform images differ
 // so tests can verify which platform was actually resolved by inspecting
-// container_image_created.
+// container_image_cluster_created.
 type pushedIndex struct {
 	ref          string
 	indexDigest  string
@@ -116,7 +116,7 @@ func TestMultiArch_PlatformMatch(t *testing.T) {
 	idx := pushIndex(t, "test/multiarch-match")
 
 	p, _ := ggcr.ParsePlatform("linux/amd64")
-	gather := setupAllowlistManager(t, exporter.WithPlatform(p))
+	gather := setupAllowlistManager(t, clusterexporter.WithPlatform(p))
 
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "multiarch-match-deploy", Namespace: "default"},
@@ -133,32 +133,32 @@ func TestMultiArch_PlatformMatch(t *testing.T) {
 	}
 	t.Cleanup(func() { testK8sClient.Delete(testCtx, deploy) })
 
-	// Wait for reconciliation: container_image_size_bytes is emitted with the
+	// Wait for reconciliation: container_image_cluster_size_bytes is emitted with the
 	// index digest once the image has been resolved.
 	deadline := waitDeadline()
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_size_bytes", map[string]string{
+		if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 			"digest": idx.indexDigest,
 		}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_size_bytes", map[string]string{
+	if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 		"digest": idx.indexDigest,
 	}) == nil {
 		t.Fatalf("timed out waiting for size metric for index digest %s", idx.indexDigest)
 	}
 
-	// container_image_created reflects the resolved platform image's config.
+	// container_image_cluster_created reflects the resolved platform image's config.
 	// For linux/amd64 it should equal amd64Created.
-	m := findMetric(gather(), "container_image_created", map[string]string{"digest": idx.indexDigest})
+	m := findMetric(gather(), "container_image_cluster_created", map[string]string{"digest": idx.indexDigest})
 	if m == nil {
-		t.Fatal("container_image_created metric not found")
+		t.Fatal("container_image_cluster_created metric not found")
 	}
 	got := time.Unix(int64(m.GetGauge().GetValue()), 0).UTC()
 	if got != idx.amd64Created {
-		t.Errorf("container_image_created: got %v, want amd64 created %v", got, idx.amd64Created)
+		t.Errorf("container_image_cluster_created: got %v, want amd64 created %v", got, idx.amd64Created)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestMultiArch_PlatformFallback(t *testing.T) {
 	idx := pushIndex(t, "test/multiarch-fallback")
 
 	p, _ := ggcr.ParsePlatform("linux/s390x") // not in the index
-	gather := setupAllowlistManager(t, exporter.WithPlatform(p))
+	gather := setupAllowlistManager(t, clusterexporter.WithPlatform(p))
 
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "multiarch-fallback-deploy", Namespace: "default"},
@@ -188,27 +188,27 @@ func TestMultiArch_PlatformFallback(t *testing.T) {
 
 	deadline := waitDeadline()
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_size_bytes", map[string]string{
+		if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 			"digest": idx.indexDigest,
 		}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_size_bytes", map[string]string{
+	if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 		"digest": idx.indexDigest,
 	}) == nil {
 		t.Fatalf("timed out waiting for size metric for index digest %s", idx.indexDigest)
 	}
 
 	// The first manifest in the index is amd64, so creation time should match.
-	m := findMetric(gather(), "container_image_created", map[string]string{"digest": idx.indexDigest})
+	m := findMetric(gather(), "container_image_cluster_created", map[string]string{"digest": idx.indexDigest})
 	if m == nil {
-		t.Fatal("container_image_created metric not found")
+		t.Fatal("container_image_cluster_created metric not found")
 	}
 	got := time.Unix(int64(m.GetGauge().GetValue()), 0).UTC()
 	if got != idx.amd64Created {
-		t.Errorf("container_image_created: got %v, want amd64 created (fallback) %v", got, idx.amd64Created)
+		t.Errorf("container_image_cluster_created: got %v, want amd64 created (fallback) %v", got, idx.amd64Created)
 	}
 }
 
@@ -236,27 +236,27 @@ func TestMultiArch_NoPlatform(t *testing.T) {
 
 	deadline := waitDeadline()
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_size_bytes", map[string]string{
+		if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 			"digest": idx.indexDigest,
 		}) != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_size_bytes", map[string]string{
+	if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 		"digest": idx.indexDigest,
 	}) == nil {
 		t.Fatalf("timed out waiting for size metric for index digest %s", idx.indexDigest)
 	}
 
 	// With no platform set, the first manifest (amd64) should be used.
-	m := findMetric(gather(), "container_image_created", map[string]string{"digest": idx.indexDigest})
+	m := findMetric(gather(), "container_image_cluster_created", map[string]string{"digest": idx.indexDigest})
 	if m == nil {
-		t.Fatal("container_image_created metric not found")
+		t.Fatal("container_image_cluster_created metric not found")
 	}
 	got := time.Unix(int64(m.GetGauge().GetValue()), 0).UTC()
 	if got != idx.amd64Created {
-		t.Errorf("container_image_created: got %v, want amd64 created (first manifest) %v", got, idx.amd64Created)
+		t.Errorf("container_image_cluster_created: got %v, want amd64 created (first manifest) %v", got, idx.amd64Created)
 	}
 }
 
@@ -299,11 +299,11 @@ func TestNamespaceFiltering(t *testing.T) {
 	// Use a dedicated Prometheus registry so we don't pollute the global one.
 	reg := prometheus.NewRegistry()
 
-	if err := exporter.SetupControllers(
+	if err := clusterexporter.SetupControllers(
 		mgr,
-		exporter.WithCacheDuration(5*time.Minute),
-		exporter.WithK8sKeychain(false),
-		exporter.WithMetricsRegistry(reg),
+		clusterexporter.WithCacheDuration(5*time.Minute),
+		clusterexporter.WithK8sKeychain(false),
+		clusterexporter.WithMetricsRegistry(reg),
 	); err != nil {
 		t.Fatalf("setting up controllers: %v", err)
 	}
@@ -353,14 +353,14 @@ func TestNamespaceFiltering(t *testing.T) {
 	// only happens for namespaces in the watch scope.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if m := findMetric(gather(), "container_image_size_bytes", map[string]string{
+		if m := findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 			"digest": imgWatched.digest,
 		}); m != nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_size_bytes", map[string]string{
+	if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 		"digest": imgWatched.digest,
 	}) == nil {
 		t.Fatal("timed out waiting for ns-watched image size metric")
@@ -368,7 +368,7 @@ func TestNamespaceFiltering(t *testing.T) {
 
 	// The ignored namespace pod's image must never be fetched into the cache,
 	// so its size metric must not appear.
-	if findMetric(gather(), "container_image_size_bytes", map[string]string{
+	if findMetric(gather(), "container_image_cluster_size_bytes", map[string]string{
 		"digest": imgIgnored.digest,
 	}) != nil {
 		t.Error("unexpected size metric for image in ns-ignored: reconciler should not process pods outside the watched namespace")
@@ -409,7 +409,7 @@ func TestReconciler_PerImageErrorIsolation(t *testing.T) {
 	// proving the reconciler continued past the error from the bad image.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if findMetric(gather(), "container_image_container_info", map[string]string{
+		if findMetric(gather(), "container_image_cluster_container_info", map[string]string{
 			"image":  good.ref,
 			"digest": good.digest,
 		}) != nil {
@@ -417,7 +417,7 @@ func TestReconciler_PerImageErrorIsolation(t *testing.T) {
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if findMetric(gather(), "container_image_container_info", map[string]string{
+	if findMetric(gather(), "container_image_cluster_container_info", map[string]string{
 		"image":  good.ref,
 		"digest": good.digest,
 	}) == nil {
@@ -426,7 +426,7 @@ func TestReconciler_PerImageErrorIsolation(t *testing.T) {
 
 	// The bad image must appear in container_info (it's a known container) but
 	// with an empty digest since it was never fetched into the cache.
-	if findMetric(gather(), "container_image_container_info", map[string]string{
+	if findMetric(gather(), "container_image_cluster_container_info", map[string]string{
 		"image":  badRef,
 		"digest": "",
 	}) == nil {
