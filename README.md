@@ -9,10 +9,44 @@ Exports Prometheus metrics about container images in a Kubernetes cluster.
 Particularly useful for tracking usage and adoption of Chainguard images across
 a cluster based on image or container metadata.
 
+![dashboard](images/dashboard.png)
+
 ## Components
 
 The project consists of two components, each of which can be deployed
 independently or together.
+
+### Node Exporter
+
+A DaemonSet that runs on each node and exports per-container OS release
+information plus per-image OCI labels and creation timestamps, all sourced
+locally from the CRI runtime.
+
+The most reliable method for inferring whether a running container is
+Chainguard-based, but it does need to be ran as root on the host.
+
+```mermaid
+graph TB
+    subgraph "Kubernetes Node"
+        subgraph "Node Exporter (DaemonSet pod)"
+            NE[Prometheus Exporter<br/>:8080/metrics]
+        end
+
+        CRI[CRI socket]
+        PROC[Host /proc<br/>mounted at /host/proc]
+    end
+
+    PROM[Prometheus]
+
+    NE -->|"List containers"| CRI
+    NE -->|"List images"| CRI
+    NE -->|"Read /etc/os-release"| PROC
+    PROM -->|Scrape each node| NE
+
+    style NE fill:#e1ffe1
+    style CRI fill:#ffe1e1
+    style PROC fill:#ffe1e1
+```
 
 ### Exporter
 
@@ -62,38 +96,6 @@ graph TB
     style RECONCILER fill:#fff3e1
     style EXPORTER fill:#f3e1ff
     style REGISTRY fill:#ffe1e1
-```
-
-### Node Exporter
-
-A DaemonSet that runs on each node and exports per-container OS release
-information plus per-image OCI labels and creation timestamps, all sourced
-locally from the CRI runtime.
-
-The most reliable method for inferring whether a running container is
-Chainguard-based, but it does need to be ran as root on the host.
-
-```mermaid
-graph TB
-    subgraph "Kubernetes Node"
-        subgraph "Node Exporter (DaemonSet pod)"
-            NE[Prometheus Exporter<br/>:8080/metrics]
-        end
-
-        CRI[CRI socket]
-        PROC[Host /proc<br/>mounted at /host/proc]
-    end
-
-    PROM[Prometheus]
-
-    NE -->|"List containers"| CRI
-    NE -->|"List images"| CRI
-    NE -->|"Read /etc/os-release"| PROC
-    PROM -->|Scrape each node| NE
-
-    style NE fill:#e1ffe1
-    style CRI fill:#ffe1e1
-    style PROC fill:#ffe1e1
 ```
 
 ## Installation
@@ -152,19 +154,6 @@ prometheus.io/path: "/metrics"
 
 ## Metrics
 
-### Exporter
-
-| Metric                          | Description                                                                                            | Labels                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| container_image_container_info  | Details about containers running in the cluster, including the image digest resolved by the exporter.  | group, version, kind, namespace, name, jsonpath, image, digest |
-| container_image_annotation      | Annotations from the image manifest.                                                                   | digest, key, value                                             |
-| container_image_label           | Labels from the image config.                                                                          | digest, key, value                                             |
-| container_image_size_bytes      | The size of the image in the registry.                                                                 | digest                                                         |
-| container_image_created         | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
-| container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
-| container_image_registry_requests_total | Count of HTTP requests issued to container registries. `code="0"` indicates a transport-level error (no HTTP response). | host, method, code                                             |
-| container_image_registry_request_duration_seconds | Histogram of HTTP request latency to container registries.                                  | host, method, code                                             |
-
 ### Node Exporter
 
 | Metric                               | Description                                                                                                      | Labels                                                                                                                                                                                                            |
@@ -178,84 +167,203 @@ By default the `container_image_node_image_*` metrics only cover images
 backing a running container. Install with `--set nodeExporter.onlyImagesInUse=false`
 to report every image cached by the local CRI runtime.
 
-## Supported Resources
+### Exporter
 
-The exporter watches the following resource types and extracts container image
-references from each.
-
-### Built-in
-
-| Group  | Resource      | Container paths                                                        |
-| ------ | ------------- | ---------------------------------------------------------------------- |
-| core   | Pod           | `spec.initContainers`, `spec.containers`, `spec.ephemeralContainers`   |
-| apps   | Deployment    | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
-| apps   | StatefulSet   | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
-| apps   | DaemonSet     | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
-| batch  | Job           | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
-| batch  | CronJob       | `spec.jobTemplate.spec.template.spec.initContainers`, `spec.jobTemplate.spec.template.spec.containers` |
-
-### CRDs (auto-discovered)
-
-The following CRD types are watched automatically if they are installed in the
-cluster. No configuration is required — the exporter queries the API server's
-discovery endpoint at startup to detect which of these are available.
-
-However, you will need to give the exporter permissions to list the resources
-(see below).
-
-| Group                | Resource              | Container paths                                                                                    |
-| -------------------- | --------------------- | -------------------------------------------------------------------------------------------------- |
-| tekton.dev           | Task                  | `spec.steps`, `spec.sidecars`                                                                      |
-| tekton.dev           | TaskRun               | `spec.taskSpec.steps`, `spec.taskSpec.sidecars`                                                    |
-| serving.knative.dev  | Service               | `spec.template.spec.containers`, `spec.template.spec.initContainers`                               |
-| serving.knative.dev  | Revision              | `spec.containers`, `spec.initContainers`                                                           |
-| argoproj.io          | Workflow              | `spec.templates[*].container`, `spec.templates[*].script`, `spec.templates[*].initContainers`, `spec.templates[*].sidecars` |
-| argoproj.io          | WorkflowTemplate      | `spec.templates[*].container`, `spec.templates[*].script`, `spec.templates[*].initContainers`, `spec.templates[*].sidecars` |
-| argoproj.io          | ClusterWorkflowTemplate | `spec.templates[*].container`, `spec.templates[*].script`, `spec.templates[*].initContainers`, `spec.templates[*].sidecars` |
-| argoproj.io          | CronWorkflow          | `spec.workflowSpec.templates[*].container`, `spec.workflowSpec.templates[*].script`, `spec.workflowSpec.templates[*].initContainers`, `spec.workflowSpec.templates[*].sidecars` |
-
-### Permissions for CRDs
-
-The chart's default ClusterRole only grants permissions for the built-in
-resource types. If any of the CRDs above are installed in your cluster and
-you want the exporter to watch them, extend the ClusterRole via
-`exporter.rbac.extraRules` in a values file or with `--set`.
-
-For example, to add Tekton, Knative, and Argo Workflows support, use the
-following values:
-
-```yaml
-exporter:
-  rbac:
-    extraRules:
-      - apiGroups: ["tekton.dev"]
-        resources: ["tasks", "taskruns"]
-        verbs: ["get", "list", "watch"]
-      - apiGroups: ["serving.knative.dev"]
-        resources: ["services", "revisions"]
-        verbs: ["get", "list", "watch"]
-      - apiGroups: ["argoproj.io"]
-        resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
-        verbs: ["get", "list", "watch"]
-```
-
-At startup the exporter performs a test `list` against each discovered CRD to
-verify it has permission. If the list is denied, that resource type is silently
-skipped and a message is logged. The exporter will continue to function
-normally for all other resource types.
+| Metric                          | Description                                                                                            | Labels                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| container_image_container_info  | Details about containers running in the cluster, including the image digest resolved by the exporter.  | group, version, kind, namespace, name, jsonpath, image, digest |
+| container_image_annotation      | Annotations from the image manifest.                                                                   | digest, key, value                                             |
+| container_image_label           | Labels from the image config.                                                                          | digest, key, value                                             |
+| container_image_size_bytes      | The size of the image in the registry.                                                                 | digest                                                         |
+| container_image_created         | The created date from the image config. Expressed as a Unix Epoch Time.                                | digest                                                         |
+| container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
+| container_image_registry_requests_total | Count of HTTP requests issued to container registries. `code="0"` indicates a transport-level error (no HTTP response). | host, method, code                                             |
+| container_image_registry_request_duration_seconds | Histogram of HTTP request latency to container registries.                                  | host, method, code                                             |
 
 ## Dashboards
 
 See [dashboards](./deploy/chart/dashboards) for examples of Grafana dashboards
 that consume the exporter's metrics.
 
-![dashboard](images/dashboard.png)
+## Example Queries
+
+See the [Grafana dashboards](./deploy/chart/dashboards) for more complete
+examples of how to consume the metrics.
+
+### Node Exporter
+
+#### OS Distribution Breakdown Across Running Containers
+
+Using the node exporter's `container_image_node_container_info` metric, you can
+see which OS distributions are actually running across the cluster:
+
+```
+count by (os_id) (container_image_node_container_info)
+```
+
+This groups running containers by their `ID` from `/etc/os-release` (e.g.
+`alpine`, `debian`, `wolfi`, `chainguard`), giving a real-time view of OS
+distribution across nodes.
+
+#### Percentage of Containers Based on Chainguard
+
+Because the node exporter reads `/etc/os-release` directly from each
+container's root filesystem, you can identify Chainguard-based containers by
+their `os_id` (`chainguard` or `wolfi`) without relying on labels being
+propagated from the base image:
+
+```
+  100
+*
+    count(container_image_node_container_info{os_id=~"chainguard|wolfi"})
+  /
+    count(container_image_node_container_info)
+```
+
+Unlike the label-based query in the [Exporter](#exporter-1) section, this
+counts running containers on nodes rather than container specs, so results are
+skewed by Deployments and DaemonSets that run many replicas.
+
+#### Images Older Than X Number of Days
+
+Use `container_image_node_image_created` joined against
+`container_image_node_container_info` to find running containers whose image
+was created more than 14 days ago:
+
+```
+    time()
+  -
+    (
+        (container_image_node_image_created >= 0)
+      * on (image_id) group_right
+        container_image_node_container_info
+    )
+>
+  86400 * 14
+```
+
+The `>= 0` guard drops images that don't set a `created` timestamp, so they
+aren't reported as being older than the epoch.
+
+### Exporter
+
+#### Percentage of Containers Based on Chainguard
+
+Unless they are specifically overwritten, Docker will persist the labels from
+the base image in the images it builds. This means you can use those labels to
+infer various things about the images defined in your clusters.
+
+For instance, you can use the presence of any of `dev.chainguard.image.title`,
+`dev.chainguard.package.main`, or `org.opencontainers.image.vendor="Chainguard"`
+to calculate the percentage of containers defined in the cluster that are
+using Chainguard images or images based on Chainguard.
+
+```
+  (
+      count(
+        container_image_container_info{kind!="Pod"}
+        * on (digest) group_left
+          count by (digest) (
+              container_image_label{key="dev.chainguard.image.title"}
+            or
+              container_image_label{key="dev.chainguard.package.main"}
+            or
+              container_image_label{key="org.opencontainers.image.vendor", value="Chainguard"}
+          )
+      )
+    /
+      count(
+        container_image_container_info{kind!="Pod"}
+      )
+  )
+*
+  100
+```
+
+This query excludes pods so that it is measuring the container specs that are
+directly configured by the user (i.e Deployments, StatefulSets, CronJobs).
+
+This is typically a better way to measure the number of 'applications that
+still need to be migrated to Chainguard' than looking at the running
+containers, which can be skewed by, for instance, Deployments or Daemonsets
+that run 100s of pods versus a StatefulSet that runs a handful.
+
+#### Images Older Than X Number of Days
+
+Frequently rebuilding your images from up to date base images is an effective
+way to ensure you are incorporating CVE fixes.
+
+You can use `container_image_created` to identify images that weren't built
+recently.
+
+For instance, this query returns series for images that were created more than
+14 days ago.
+
+```
+    time()
+  -
+    (
+        max by (digest, image) (container_image_container_info)
+      * on (digest) group_left ()
+        container_image_created
+    )
+>
+  86400 * 14
+```
+
+It's worth noting that not all build tools will set the `created` timestamp when
+they build an image.
 
 ## Configuration
 
 Configuration is expressed through the Helm chart's values. The examples below
 use `--set` for brevity; the same keys can be set in a values file passed with
 `-f`.
+
+### Node Exporter
+
+#### CRI socket
+
+Path to the CRI runtime socket on the host. Defaults to
+`/run/containerd/containerd.sock`.
+
+```
+--set nodeExporter.criSocket=/run/crio/crio.sock
+```
+
+#### proc root
+
+The node exporter reads each container's `/etc/os-release` via
+`/host/proc/{pid}/root`. If your cluster mounts the host `/proc` at a different
+path, override it with:
+
+```
+--set nodeExporter.procRoot=/host/proc
+```
+
+#### Only images in use
+
+By default the node-exporter only reports `container_image_node_image_*`
+metrics for images currently backing a running container on the node. To
+report every image cached by the local CRI runtime (useful for tracking
+disk usage from images that aren't currently in use):
+
+```
+--set nodeExporter.onlyImagesInUse=false
+```
+
+#### Label allowlist
+
+OCI image labels can carry arbitrary builder-controlled content (SBOMs,
+multi-line descriptions, build IDs that change every build). To restrict
+`container_image_node_image_labels` to a fixed set of keys:
+
+```
+--set 'nodeExporter.labelAllowlist[0]=org.opencontainers.image.title' \
+--set 'nodeExporter.labelAllowlist[1]=org.opencontainers.image.vendor'
+```
+
+When unset (the default), every label on every reported image is emitted.
 
 ### Exporter
 
@@ -315,50 +423,71 @@ Override the default platform with:
 --set exporter.platform=linux/arm64
 ```
 
-### Node Exporter
+#### Supported Resources
 
-#### CRI socket
+The exporter watches the following resource types and extracts container image
+references from each.
 
-Path to the CRI runtime socket on the host. Defaults to
-`/run/containerd/containerd.sock`.
+##### Built-in
 
+| Group  | Resource      | Container paths                                                        |
+| ------ | ------------- | ---------------------------------------------------------------------- |
+| core   | Pod           | `spec.initContainers`, `spec.containers`, `spec.ephemeralContainers`   |
+| apps   | Deployment    | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
+| apps   | StatefulSet   | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
+| apps   | DaemonSet     | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
+| batch  | Job           | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
+| batch  | CronJob       | `spec.jobTemplate.spec.template.spec.initContainers`, `spec.jobTemplate.spec.template.spec.containers` |
+
+##### CRDs (auto-discovered)
+
+The following CRD types are watched automatically if they are installed in the
+cluster. No configuration is required — the exporter queries the API server's
+discovery endpoint at startup to detect which of these are available.
+
+However, you will need to give the exporter permissions to list the resources
+(see below).
+
+| Group                | Resource              | Container paths                                                                                    |
+| -------------------- | --------------------- | -------------------------------------------------------------------------------------------------- |
+| tekton.dev           | Task                  | `spec.steps`, `spec.sidecars`                                                                      |
+| tekton.dev           | TaskRun               | `spec.taskSpec.steps`, `spec.taskSpec.sidecars`                                                    |
+| serving.knative.dev  | Service               | `spec.template.spec.containers`, `spec.template.spec.initContainers`                               |
+| serving.knative.dev  | Revision              | `spec.containers`, `spec.initContainers`                                                           |
+| argoproj.io          | Workflow              | `spec.templates[*].container`, `spec.templates[*].script`, `spec.templates[*].initContainers`, `spec.templates[*].sidecars` |
+| argoproj.io          | WorkflowTemplate      | `spec.templates[*].container`, `spec.templates[*].script`, `spec.templates[*].initContainers`, `spec.templates[*].sidecars` |
+| argoproj.io          | ClusterWorkflowTemplate | `spec.templates[*].container`, `spec.templates[*].script`, `spec.templates[*].initContainers`, `spec.templates[*].sidecars` |
+| argoproj.io          | CronWorkflow          | `spec.workflowSpec.templates[*].container`, `spec.workflowSpec.templates[*].script`, `spec.workflowSpec.templates[*].initContainers`, `spec.workflowSpec.templates[*].sidecars` |
+
+##### Permissions for CRDs
+
+The chart's default ClusterRole only grants permissions for the built-in
+resource types. If any of the CRDs above are installed in your cluster and
+you want the exporter to watch them, extend the ClusterRole via
+`exporter.rbac.extraRules` in a values file or with `--set`.
+
+For example, to add Tekton, Knative, and Argo Workflows support, use the
+following values:
+
+```yaml
+exporter:
+  rbac:
+    extraRules:
+      - apiGroups: ["tekton.dev"]
+        resources: ["tasks", "taskruns"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["serving.knative.dev"]
+        resources: ["services", "revisions"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["argoproj.io"]
+        resources: ["workflows", "workflowtemplates", "clusterworkflowtemplates", "cronworkflows"]
+        verbs: ["get", "list", "watch"]
 ```
---set nodeExporter.criSocket=/run/crio/crio.sock
-```
 
-#### proc root
-
-The node exporter reads each container's `/etc/os-release` via
-`/host/proc/{pid}/root`. If your cluster mounts the host `/proc` at a different
-path, override it with:
-
-```
---set nodeExporter.procRoot=/host/proc
-```
-
-#### Only images in use
-
-By default the node-exporter only reports `container_image_node_image_*`
-metrics for images currently backing a running container on the node. To
-report every image cached by the local CRI runtime (useful for tracking
-disk usage from images that aren't currently in use):
-
-```
---set nodeExporter.onlyImagesInUse=false
-```
-
-#### Label allowlist
-
-OCI image labels can carry arbitrary builder-controlled content (SBOMs,
-multi-line descriptions, build IDs that change every build). To restrict
-`container_image_node_image_labels` to a fixed set of keys:
-
-```
---set 'nodeExporter.labelAllowlist[0]=org.opencontainers.image.title' \
---set 'nodeExporter.labelAllowlist[1]=org.opencontainers.image.vendor'
-```
-
-When unset (the default), every label on every reported image is emitted.
+At startup the exporter performs a test `list` against each discovered CRD to
+verify it has permission. If the list is denied, that resource type is silently
+skipped and a message is logged. The exporter will continue to function
+normally for all other resource types.
 
 ## Development
 
@@ -395,89 +524,6 @@ binary inside the cluster node, then tears everything down.
 ```
 make test-node
 ```
-
-## Example Queries
-
-### Percentage of Containers Based on Chainguard
-
-Unless they are specifically overwritten, Docker will persist the labels from
-the base image in the images it builds. This means you can use those labels to
-infer various things about the images defined in your clusters.
-
-For instance, you can use the presence of any of `dev.chainguard.image.title`,
-`dev.chainguard.package.main`, or `org.opencontainers.image.vendor="Chainguard"`
-to calculate the percentage of containers defined in the cluster that are
-using Chainguard images or images based on Chainguard.
-
-```
-  (
-      count(
-        container_image_container_info{kind!="Pod"}
-        * on (digest) group_left
-          count by (digest) (
-              container_image_label{key="dev.chainguard.image.title"}
-            or
-              container_image_label{key="dev.chainguard.package.main"}
-            or
-              container_image_label{key="org.opencontainers.image.vendor", value="Chainguard"}
-          )
-      )
-    /
-      count(
-        container_image_container_info{kind!="Pod"}
-      )
-  )
-*
-  100
-```
-
-This query excludes pods so that it is measuring the container specs that are
-directly configured by the user (i.e Deployments, StatefulSets, CronJobs).
-
-This is typically a better way to measure the number of 'applications that
-still need to be migrated to Chainguard' than looking at the running
-containers, which can be skewed by, for instance, Deployments or Daemonsets
-that run 100s of pods versus a StatefulSet that runs a handful.
-
-
-### Images Older Than X Number of Days
-
-Frequently rebuilding your images from up to date base images is an effective
-way to ensure you are incorporating CVE fixes.
-
-You can use `container_image_created` to identify images that weren't built
-recently.
-
-For instance, this query returns series for images that were created more than
-14 days ago.
-
-```
-    time()
-  -
-    (
-        max by (digest, image) (container_image_container_info)
-      * on (digest) group_left ()
-        container_image_created
-    )
->
-  86400 * 14
-```
-
-It's worth noting that not all build tools will set the `created` timestamp when
-they build an image.
-
-### OS Distribution Breakdown Across Running Containers
-
-Using the node exporter's `container_image_node_container_info` metric, you can
-see which OS distributions are actually running across the cluster:
-
-```
-count by (os_id) (container_image_node_container_info)
-```
-
-This groups running containers by their `ID` from `/etc/os-release` (e.g.
-`alpine`, `debian`, `wolfi`, `chainguard`), giving a real-time view of OS
-distribution across nodes.
 
 ## Demo
 
