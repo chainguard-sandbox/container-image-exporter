@@ -96,6 +96,7 @@ more details.
 | container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
 | container_image_registry_requests_total | Count of HTTP requests issued to container registries. `code="0"` indicates a transport-level error (no HTTP response). | host, method, code                                             |
 | container_image_registry_request_duration_seconds | Histogram of HTTP request latency to container registries.                                  | host, method, code                                             |
+| container_image_exporter_build_info | Always 1; labels carry the build version, git commit, and Go runtime version.                       | version, commit, goversion                                     |
 
 ## Example Queries
 

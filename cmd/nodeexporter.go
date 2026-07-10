@@ -57,6 +57,7 @@ Metrics exported:
 			nodeexporter.WithLabelAllowlist(neLabelAllowlist),
 		)
 		reg.MustRegister(collector)
+		reg.MustRegister(newBuildInfoCollector("container_image_node_exporter"))
 
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))

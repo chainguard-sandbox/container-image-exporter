@@ -30,6 +30,10 @@ DEMO_CLUSTER    ?= cie-demo
 DEMO_IMAGE_TAG  ?= 24h
 DEMO_NAMESPACE  ?= container-image-exporter
 
+VERSION      ?= $(shell git describe --tags --always --dirty)
+COMMIT       ?= $(shell git rev-parse --short HEAD)
+DOCKER_IMAGE ?= container-image-exporter:$(VERSION)
+
 ifeq ($(shell uname -s),Darwin)
 SHA256SUM := shasum -a 256
 else
@@ -39,6 +43,13 @@ endif
 .PHONY: build
 build:
 	go build ./...
+
+.PHONY: docker
+docker:
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		-t $(DOCKER_IMAGE) .
 
 .PHONY: test
 test: envtest

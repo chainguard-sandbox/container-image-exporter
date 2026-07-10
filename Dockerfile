@@ -14,8 +14,13 @@ COPY internal internal
 COPY cmd cmd
 COPY main.go .
 
+ARG VERSION
+ARG COMMIT
+
 # Build the binary
-RUN CGO_ENABLED=0 go build -o container-image-exporter .
+RUN CGO_ENABLED=0 go build \
+    -ldflags "-X github.com/prometheus/common/version.Version=${VERSION} -X github.com/prometheus/common/version.Revision=${COMMIT}" \
+    -o container-image-exporter .
 
 # Final stage
 FROM cgr.dev/chainguard/static:latest

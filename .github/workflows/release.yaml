@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # every Monday at 00:00 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Check if any changes since last release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch --tags
+          TAG=$(git tag --points-at HEAD)
+          if [ -z "$TAG" ]; then
+            echo "No tag points at HEAD, so we need a new tag and then a new release."
+            echo "need_release=yes" >> "$GITHUB_OUTPUT"
+          else
+            RELEASE=$(gh release view "$TAG" --json tagName --jq '.tagName' || echo "none")
+            if [ "$RELEASE" == "$TAG" ]; then
+              echo "A release exists for tag $TAG, which has the latest changes, so no need for a new tag or release."
+              echo "need_release=no" >> "$GITHUB_OUTPUT"
+            else
+              echo "Tag $TAG exists, but no release is associated. Need a new release."
+              echo "need_release=yes" >> "$GITHUB_OUTPUT"
+              echo "existing_tag=$TAG" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Bump version and push tag
+        id: create_tag
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
+        if: steps.check.outputs.need_release == 'yes' && steps.check.outputs.existing_tag == ''
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.need_release == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.check.outputs.existing_tag || steps.create_tag.outputs.new_tag }}
+        run: gh release create "$TAG" --generate-notes --title "$TAG"
