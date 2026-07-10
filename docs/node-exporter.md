@@ -28,6 +28,19 @@ helm install container-image-exporter ./deploy/chart \
     --set exporter.enabled=false
 ```
 
+If you are using the Prometheus Operator, enable the ServiceMonitor:
+
+```
+--set nodeExporter.serviceMonitor.enabled=true
+```
+
+If you are using Grafana (via kube-prometheus-stack), enable automatic
+dashboard provisioning:
+
+```
+--set grafana.dashboards.enabled=true
+```
+
 See the [installation instructions](../README.md#installation) for
 more details.
 
@@ -43,55 +56,6 @@ more details.
 By default the `container_image_node_image_*` metrics only cover images
 backing a running container. Install with `--set nodeExporter.onlyImagesInUse=false`
 to report every image cached by the local CRI runtime.
-
-## Configuration
-
-Configuration is expressed through the Helm chart's values. The examples below
-use `--set` for brevity; the same keys can be set in a values file passed with
-`-f`.
-
-### CRI socket
-
-Path to the CRI runtime socket on the host. Defaults to
-`/run/containerd/containerd.sock`.
-
-```
---set nodeExporter.criSocket=/run/crio/crio.sock
-```
-
-### proc root
-
-The node exporter reads each container's `/etc/os-release` via
-`/host/proc/{pid}/root`. If your cluster mounts the host `/proc` at a different
-path, override it with:
-
-```
---set nodeExporter.procRoot=/host/proc
-```
-
-### Only images in use
-
-By default the node-exporter only reports `container_image_node_image_*`
-metrics for images currently backing a running container on the node. To
-report every image cached by the local CRI runtime (useful for tracking
-disk usage from images that aren't currently in use):
-
-```
---set nodeExporter.onlyImagesInUse=false
-```
-
-### Label allowlist
-
-OCI image labels can carry arbitrary builder-controlled content (SBOMs,
-multi-line descriptions, build IDs that change every build). To restrict
-`container_image_node_image_labels` to a fixed set of keys:
-
-```
---set 'nodeExporter.labelAllowlist[0]=org.opencontainers.image.title' \
---set 'nodeExporter.labelAllowlist[1]=org.opencontainers.image.vendor'
-```
-
-When unset (the default), every label on every reported image is emitted.
 
 ## Example Queries
 
@@ -150,3 +114,52 @@ was created more than 14 days ago:
 
 The `>= 0` guard drops images that don't set a `created` timestamp, so they
 aren't reported as being older than the epoch.
+
+## Configuration
+
+Configuration is expressed through the Helm chart's values. The examples below
+use `--set` for brevity; the same keys can be set in a values file passed with
+`-f`.
+
+### CRI socket
+
+Path to the CRI runtime socket on the host. Defaults to
+`/run/containerd/containerd.sock`.
+
+```
+--set nodeExporter.criSocket=/run/crio/crio.sock
+```
+
+### proc root
+
+The node exporter reads each container's `/etc/os-release` via
+`/host/proc/{pid}/root`. If your cluster mounts the host `/proc` at a different
+path, override it with:
+
+```
+--set nodeExporter.procRoot=/host/proc
+```
+
+### Only images in use
+
+By default the node-exporter only reports `container_image_node_image_*`
+metrics for images currently backing a running container on the node. To
+report every image cached by the local CRI runtime (useful for tracking
+disk usage from images that aren't currently in use):
+
+```
+--set nodeExporter.onlyImagesInUse=false
+```
+
+### Label allowlist
+
+OCI image labels can carry arbitrary builder-controlled content (SBOMs,
+multi-line descriptions, build IDs that change every build). To restrict
+`container_image_node_image_labels` to a fixed set of keys:
+
+```
+--set 'nodeExporter.labelAllowlist[0]=org.opencontainers.image.title' \
+--set 'nodeExporter.labelAllowlist[1]=org.opencontainers.image.vendor'
+```
+
+When unset (the default), every label on every reported image is emitted.

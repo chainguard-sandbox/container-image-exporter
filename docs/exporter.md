@@ -25,6 +25,19 @@ helm install container-image-exporter ./deploy/chart \
     --set nodeExporter.enabled=false
 ```
 
+If you are using the Prometheus Operator, enable the ServiceMonitor:
+
+```
+--set exporter.serviceMonitor.enabled=true
+```
+
+If you are using Grafana (via kube-prometheus-stack), enable automatic
+dashboard provisioning:
+
+```
+--set grafana.dashboards.enabled=true
+```
+
 See the [installation instructions](../README.md#installation) for
 more details.
 
@@ -40,6 +53,78 @@ more details.
 | container_image_up              | 1 if the last collection completed successfully (all resource types listed), 0 otherwise.              | —                                                              |
 | container_image_registry_requests_total | Count of HTTP requests issued to container registries. `code="0"` indicates a transport-level error (no HTTP response). | host, method, code                                             |
 | container_image_registry_request_duration_seconds | Histogram of HTTP request latency to container registries.                                  | host, method, code                                             |
+
+## Example Queries
+
+See the [Grafana dashboards](../deploy/chart/dashboards) for more complete
+examples of how to consume the metrics.
+
+### Percentage of Containers Based on Chainguard
+
+Unless they are specifically overwritten, Docker will persist the labels from
+the base image in the images it builds. This means you can use those labels to
+infer various things about the images defined in your clusters.
+
+For instance, you can use the presence of any of `dev.chainguard.image.title`,
+`dev.chainguard.package.main`, or `org.opencontainers.image.vendor="Chainguard"`
+to calculate the percentage of containers defined in the cluster that are
+using Chainguard images or images based on Chainguard.
+
+```
+  (
+      count(
+        container_image_container_info{kind!="Pod"}
+        * on (digest) group_left
+          count by (digest) (
+              container_image_label{key="dev.chainguard.image.title"}
+            or
+              container_image_label{key="dev.chainguard.package.main"}
+            or
+              container_image_label{key="org.opencontainers.image.vendor", value="Chainguard"}
+          )
+      )
+    /
+      count(
+        container_image_container_info{kind!="Pod"}
+      )
+  )
+*
+  100
+```
+
+This query excludes pods so that it is measuring the container specs that are
+directly configured by the user (i.e Deployments, StatefulSets, CronJobs).
+
+This is typically a better way to measure the number of 'applications that
+still need to be migrated to Chainguard' than looking at the running
+containers, which can be skewed by, for instance, Deployments or Daemonsets
+that run 100s of pods versus a StatefulSet that runs a handful.
+
+### Images Older Than X Number of Days
+
+Frequently rebuilding your images from up to date base images is an effective
+way to ensure you are incorporating CVE fixes.
+
+You can use `container_image_created` to identify images that weren't built
+recently.
+
+For instance, this query returns series for images that were created more than
+14 days ago.
+
+```
+    time()
+  -
+    (
+        max by (digest, image) (container_image_container_info)
+      * on (digest) group_left ()
+        container_image_created
+    )
+>
+  86400 * 14
+```
+
+It's worth noting that not all build tools will set the `created` timestamp when
+they build an image.
 
 ## Configuration
 
@@ -168,75 +253,3 @@ At startup the exporter performs a test `list` against each discovered CRD to
 verify it has permission. If the list is denied, that resource type is silently
 skipped and a message is logged. The exporter will continue to function
 normally for all other resource types.
-
-## Example Queries
-
-See the [Grafana dashboards](../deploy/chart/dashboards) for more complete
-examples of how to consume the metrics.
-
-### Percentage of Containers Based on Chainguard
-
-Unless they are specifically overwritten, Docker will persist the labels from
-the base image in the images it builds. This means you can use those labels to
-infer various things about the images defined in your clusters.
-
-For instance, you can use the presence of any of `dev.chainguard.image.title`,
-`dev.chainguard.package.main`, or `org.opencontainers.image.vendor="Chainguard"`
-to calculate the percentage of containers defined in the cluster that are
-using Chainguard images or images based on Chainguard.
-
-```
-  (
-      count(
-        container_image_container_info{kind!="Pod"}
-        * on (digest) group_left
-          count by (digest) (
-              container_image_label{key="dev.chainguard.image.title"}
-            or
-              container_image_label{key="dev.chainguard.package.main"}
-            or
-              container_image_label{key="org.opencontainers.image.vendor", value="Chainguard"}
-          )
-      )
-    /
-      count(
-        container_image_container_info{kind!="Pod"}
-      )
-  )
-*
-  100
-```
-
-This query excludes pods so that it is measuring the container specs that are
-directly configured by the user (i.e Deployments, StatefulSets, CronJobs).
-
-This is typically a better way to measure the number of 'applications that
-still need to be migrated to Chainguard' than looking at the running
-containers, which can be skewed by, for instance, Deployments or Daemonsets
-that run 100s of pods versus a StatefulSet that runs a handful.
-
-### Images Older Than X Number of Days
-
-Frequently rebuilding your images from up to date base images is an effective
-way to ensure you are incorporating CVE fixes.
-
-You can use `container_image_created` to identify images that weren't built
-recently.
-
-For instance, this query returns series for images that were created more than
-14 days ago.
-
-```
-    time()
-  -
-    (
-        max by (digest, image) (container_image_container_info)
-      * on (digest) group_left ()
-        container_image_created
-    )
->
-  86400 * 14
-```
-
-It's worth noting that not all build tools will set the `created` timestamp when
-they build an image.
