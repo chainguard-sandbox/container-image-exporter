@@ -83,6 +83,20 @@ exporter:
     #   release: prometheus
     additionalLabels: {}
 
+  grafana:
+    dashboards:
+      # Set to true to create a ConfigMap containing the exporter's Grafana
+      # dashboard. Requires the Grafana sidecar to be configured to watch for
+      # the label below. When using kube-prometheus-stack, ensure
+      # sidecar.dashboards.searchNamespace includes the namespace this chart
+      # is deployed into, or is set to ALL.
+      enabled: false
+      # Labels applied to the dashboard ConfigMap for Grafana sidecar
+      # auto-discovery. Must match sidecar.dashboards.label in your
+      # kube-prometheus-stack values.
+      labels:
+        grafana_dashboard: "1"
+
   metricsPort: 8080
   healthPort: 8081
 
@@ -176,6 +190,13 @@ nodeExporter:
     # See exporter.serviceMonitor.additionalLabels above.
     additionalLabels: {}
 
+  grafana:
+    dashboards:
+      # See exporter.grafana.dashboards above.
+      enabled: false
+      labels:
+        grafana_dashboard: "1"
+
   metricsPort: 8080
 
   service:
@@ -223,18 +244,6 @@ nodeExporter:
 
   nodeSelector: {}
   affinity: {}
-
-grafana:
-  dashboards:
-    # Set to true to create ConfigMaps containing the Grafana dashboards.
-    # Requires the Grafana sidecar to be configured to watch for the label below.
-    # When using kube-prometheus-stack, ensure sidecar.dashboards.searchNamespace
-    # includes the namespace this chart is deployed into, or is set to ALL.
-    enabled: false
-    # Labels applied to each dashboard ConfigMap for Grafana sidecar auto-discovery.
-    # Must match sidecar.dashboards.label in your kube-prometheus-stack values.
-    labels:
-      grafana_dashboard: "1"
 
 tests:
   curl:

@@ -98,6 +98,20 @@
             "additionalLabels": { "type": "object" }
           }
         },
+        "grafana": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dashboards": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "labels": { "type": "object" }
+              }
+            }
+          }
+        },
         "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "service": {
@@ -151,6 +165,20 @@
             "additionalLabels": { "type": "object" }
           }
         },
+        "grafana": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dashboards": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "labels": { "type": "object" }
+              }
+            }
+          }
+        },
         "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "service": {
           "type": "object",
@@ -171,20 +199,6 @@
         "tolerations": { "type": "array" },
         "nodeSelector": { "type": "object" },
         "affinity": { "type": "object" }
-      }
-    },
-    "grafana": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "dashboards": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "labels": { "type": "object" }
-          }
-        }
       }
     },
     "tests": {

@@ -12,29 +12,79 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: each dashboard ConfigMap renders when enabled
+  - it: exporter dashboard renders when exporter dashboard is enabled
     set:
-      grafana.dashboards.enabled: true
+      exporter.grafana.dashboards.enabled: true
+    template: templates/dashboards/chainguard-adoption.yaml
     asserts:
       - hasDocuments:
           count: 1
       - isKind:
           of: ConfigMap
 
-  - it: ConfigMaps carry the default sidecar label
+  - it: node-exporter dashboard is not rendered when only the exporter dashboard is enabled
     set:
-      grafana.dashboards.enabled: true
+      exporter.grafana.dashboards.enabled: true
+    template: templates/dashboards/node-exporter.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: node-exporter dashboard renders when node-exporter dashboard is enabled
+    set:
+      nodeExporter.grafana.dashboards.enabled: true
+    template: templates/dashboards/node-exporter.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+
+  - it: exporter dashboard is not rendered when only the node-exporter dashboard is enabled
+    set:
+      nodeExporter.grafana.dashboards.enabled: true
+    template: templates/dashboards/chainguard-adoption.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: exporter ConfigMap carries the default sidecar label
+    set:
+      exporter.grafana.dashboards.enabled: true
+    template: templates/dashboards/chainguard-adoption.yaml
     asserts:
       - equal:
           path: metadata.labels.grafana_dashboard
           value: "1"
 
-  - it: custom sidecar label is applied
+  - it: node-exporter ConfigMap carries the default sidecar label
     set:
-      grafana.dashboards.enabled: true
-      grafana.dashboards.labels:
+      nodeExporter.grafana.dashboards.enabled: true
+    template: templates/dashboards/node-exporter.yaml
+    asserts:
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+
+  - it: custom sidecar label is applied to the exporter dashboard
+    set:
+      exporter.grafana.dashboards.enabled: true
+      exporter.grafana.dashboards.labels:
         grafana_dashboard: "1"
         mycorp-dashboard: "true"
+    template: templates/dashboards/chainguard-adoption.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["mycorp-dashboard"]
+          value: "true"
+
+  - it: custom sidecar label is applied to the node-exporter dashboard
+    set:
+      nodeExporter.grafana.dashboards.enabled: true
+      nodeExporter.grafana.dashboards.labels:
+        grafana_dashboard: "1"
+        mycorp-dashboard: "true"
+    template: templates/dashboards/node-exporter.yaml
     asserts:
       - equal:
           path: metadata.labels["mycorp-dashboard"]
@@ -43,7 +93,7 @@ tests:
   - it: chainguard-adoption ConfigMap embeds the dashboard JSON
     template: templates/dashboards/chainguard-adoption.yaml
     set:
-      grafana.dashboards.enabled: true
+      exporter.grafana.dashboards.enabled: true
     asserts:
       - matchRegex:
           path: data["chainguard-adoption.json"]
@@ -52,7 +102,7 @@ tests:
   - it: node-exporter ConfigMap embeds the dashboard JSON
     template: templates/dashboards/node-exporter.yaml
     set:
-      grafana.dashboards.enabled: true
+      nodeExporter.grafana.dashboards.enabled: true
     asserts:
       - matchRegex:
           path: data["node-exporter-chainguard-adoption.json"]

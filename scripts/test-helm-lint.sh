@@ -18,7 +18,8 @@ render "default values"
 render "all components enabled + all optional features" \
     --set exporter.serviceMonitor.enabled=true \
     --set nodeExporter.serviceMonitor.enabled=true \
-    --set grafana.dashboards.enabled=true
+    --set exporter.grafana.dashboards.enabled=true \
+    --set nodeExporter.grafana.dashboards.enabled=true
 render "exporter disabled" --set exporter.enabled=false
 render "node-exporter disabled" --set nodeExporter.enabled=false
 render "both components disabled" \

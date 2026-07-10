@@ -127,7 +127,8 @@ helm install container-image-exporter ./deploy/chart \
     --set exporter.serviceMonitor.enabled=true \
     --set nodeExporter.serviceMonitor.enabled=true \
     --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock \
-    --set grafana.dashboards.enabled=true
+    --set exporter.grafana.dashboards.enabled=true \
+    --set nodeExporter.grafana.dashboards.enabled=true
 
 echo "==> Waiting for exporter Deployment to be ready"
 kubectl rollout status deployment \

@@ -135,10 +135,12 @@ If you are using the Prometheus Operator, enable the ServiceMonitors:
 --set nodeExporter.serviceMonitor.enabled=true
 ```
 
-If you are using Grafana (via kube-prometheus-stack), enable automatic dashboard provisioning:
+If you are using Grafana (via kube-prometheus-stack), enable automatic
+dashboard provisioning for each component:
 
 ```
---set grafana.dashboards.enabled=true
+--set exporter.grafana.dashboards.enabled=true \
+--set nodeExporter.grafana.dashboards.enabled=true
 ```
 
 Without the Prometheus Operator, both Services are annotated by default for
