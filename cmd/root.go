@@ -3,12 +3,14 @@ package cmd
 import (
 	"os"
 
+	"github.com/prometheus/common/version"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "container-image-exporter",
-	Short: "Export Prometheus metrics about container images in a Kubernetes cluster.",
+	Use:     "container-image-exporter",
+	Short:   "Export Prometheus metrics about container images in a Kubernetes cluster.",
+	Version: version.Print("container-image-exporter"),
 }
 
 // Execute runs the root command.
@@ -19,6 +21,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
 	rootCmd.AddCommand(exporterCmd)
 	rootCmd.AddCommand(nodeExporterCmd)
 }
