@@ -5,6 +5,29 @@ metadata from remote registries.
 
 Doesn't require host-level access to containers.
 
+## Installation
+
+Build and push the image:
+
+```
+export IMAGE_REF=your.registry/container-image-exporter:latest
+docker build -t "${IMAGE_REF}" --push .
+```
+
+To deploy only the exporter (with the node-exporter DaemonSet disabled):
+
+```
+helm install container-image-exporter ./deploy/chart \
+    --namespace container-image-exporter \
+    --create-namespace \
+    --set image.repository=your.registry/container-image-exporter \
+    --set image.tag=latest \
+    --set nodeExporter.enabled=false
+```
+
+See the [installation instructions](../README.md#installation) for
+more details.
+
 ## Metrics
 
 | Metric                          | Description                                                                                            | Labels                                                         |
@@ -80,12 +103,12 @@ Override the default platform with:
 --set exporter.platform=linux/arm64
 ```
 
-### Supported Resources
+## Supported Resources
 
 The exporter watches the following resource types and extracts container image
 references from each.
 
-#### Built-in
+### Built-in
 
 | Group  | Resource      | Container paths                                                        |
 | ------ | ------------- | ---------------------------------------------------------------------- |
@@ -96,7 +119,7 @@ references from each.
 | batch  | Job           | `spec.template.spec.initContainers`, `spec.template.spec.containers`   |
 | batch  | CronJob       | `spec.jobTemplate.spec.template.spec.initContainers`, `spec.jobTemplate.spec.template.spec.containers` |
 
-#### CRDs (auto-discovered)
+### CRDs (auto-discovered)
 
 The following CRD types are watched automatically if they are installed in the
 cluster. No configuration is required — the exporter queries the API server's
@@ -116,7 +139,7 @@ However, you will need to give the exporter permissions to list the resources
 | argoproj.io          | ClusterWorkflowTemplate | `spec.templates[*].container`, `spec.templates[*].script`, `spec.templates[*].initContainers`, `spec.templates[*].sidecars` |
 | argoproj.io          | CronWorkflow          | `spec.workflowSpec.templates[*].container`, `spec.workflowSpec.templates[*].script`, `spec.workflowSpec.templates[*].initContainers`, `spec.workflowSpec.templates[*].sidecars` |
 
-#### Permissions for CRDs
+### Permissions for CRDs
 
 The chart's default ClusterRole only grants permissions for the built-in
 resource types. If any of the CRDs above are installed in your cluster and

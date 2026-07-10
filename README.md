@@ -16,7 +16,7 @@ a cluster based on image or container metadata.
 The project consists of two components, each of which can be deployed
 independently or together.
 
-### Node Exporter
+### Node Exporter ([docs](./docs/node-exporter.md))
 
 A DaemonSet that runs on each node and exports per-container OS release
 information plus per-image OCI labels and creation timestamps, all sourced
@@ -48,11 +48,7 @@ graph TB
     style PROC fill:#ffe1e1
 ```
 
-For detailed information about this component — including metrics,
-configuration and example queries — refer to the
-[documentation](./docs/node-exporter.md).
-
-### Exporter
+### Exporter ([docs](./docs/exporter.md))
 
 A cluster-wide Deployment that watches Kubernetes resources and fetches image
 metadata from remote registries.
@@ -101,10 +97,6 @@ graph TB
     style EXPORTER fill:#f3e1ff
     style REGISTRY fill:#ffe1e1
 ```
-
-For detailed information about this component — including metrics,
-configuration and example queries — refer to the
-[documentation](./docs/exporter.md).
 
 ## Installation
 

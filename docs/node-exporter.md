@@ -7,6 +7,30 @@ locally from the CRI runtime.
 The most reliable method for inferring whether a running container is
 Chainguard-based, but it does need to be ran as root on the host.
 
+## Installation
+
+Build and push the image:
+
+```
+export IMAGE_REF=your.registry/container-image-exporter:latest
+docker build -t "${IMAGE_REF}" --push .
+```
+
+To deploy only the node-exporter (with the cluster-wide exporter Deployment
+disabled):
+
+```
+helm install container-image-exporter ./deploy/chart \
+    --namespace container-image-exporter \
+    --create-namespace \
+    --set image.repository=your.registry/container-image-exporter \
+    --set image.tag=latest \
+    --set exporter.enabled=false
+```
+
+See the [installation instructions](../README.md#installation) for
+more details.
+
 ## Metrics
 
 | Metric                               | Description                                                                                                      | Labels                                                                                                                                                                                                            |
