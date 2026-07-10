@@ -103,8 +103,8 @@ graph TB
 Build and push the image:
 
 ```
-export IMAGE_REF=your.registry/container-image-exporter:latest
-docker build -t "${IMAGE_REF}" --push .
+make docker DOCKER_IMAGE=your.registry/container-image-exporter:latest
+docker push your.registry/container-image-exporter:latest
 ```
 
 Install using the Helm chart, providing your image repository and tag:
