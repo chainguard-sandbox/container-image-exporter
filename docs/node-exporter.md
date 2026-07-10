@@ -7,6 +7,29 @@ locally from the CRI runtime.
 The most reliable method for inferring whether a running container is
 Chainguard-based, but it does need to be ran as root on the host.
 
+```mermaid
+graph TB
+    subgraph "Kubernetes Node"
+        subgraph "Node Exporter (DaemonSet pod)"
+            NE[Prometheus Exporter<br/>:8080/metrics]
+        end
+
+        CRI[CRI socket]
+        PROC[Host /proc<br/>mounted at /host/proc]
+    end
+
+    PROM[Prometheus]
+
+    NE -->|"List containers"| CRI
+    NE -->|"List images"| CRI
+    NE -->|"Read /etc/os-release"| PROC
+    PROM -->|Scrape each node| NE
+
+    style NE fill:#e1ffe1
+    style CRI fill:#ffe1e1
+    style PROC fill:#ffe1e1
+```
+
 ## Installation
 
 Build and push the image:
