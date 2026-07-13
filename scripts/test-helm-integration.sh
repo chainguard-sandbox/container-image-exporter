@@ -7,6 +7,10 @@ HELM_TEST_IMAGE_NAME="${HELM_TEST_IMAGE_NAME:-container-image-exporter}"
 HELM_TEST_IMAGE_TAG="${HELM_TEST_IMAGE_TAG:-helm-test}"
 HELM_TEST_NAMESPACE="${HELM_TEST_NAMESPACE:-container-image-exporter}"
 HELM_MONITORING_NS="${HELM_MONITORING_NS:-monitoring}"
+CLUSTER_RELEASE="${CLUSTER_RELEASE:-container-image-exporter-cluster}"
+NODE_RELEASE="${NODE_RELEASE:-container-image-exporter-node}"
+CLUSTER_CHART_DIR="${CLUSTER_CHART_DIR:-./deploy/charts/cluster-exporter}"
+NODE_CHART_DIR="${NODE_CHART_DIR:-./deploy/charts/node-exporter}"
 
 # diagnose dumps cluster state and component logs on failure. Best-effort.
 diagnose() {
@@ -117,30 +121,41 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
     --wait --timeout=10m
 
 # ---------------------------------------------------------------------------
-# Chart
+# Charts
 # ---------------------------------------------------------------------------
 
-echo "==> Installing chart"
-helm install container-image-exporter ./deploy/chart \
+echo "==> Installing cluster-exporter chart"
+helm install "${CLUSTER_RELEASE}" "${CLUSTER_CHART_DIR}" \
     --namespace "${HELM_TEST_NAMESPACE}" --create-namespace \
     --set image.repository="${HELM_TEST_IMAGE_NAME}" \
     --set image.tag="${HELM_TEST_IMAGE_TAG}" \
     --set image.pullPolicy=Never \
-    --set clusterExporter.serviceMonitor.enabled=true \
-    --set nodeExporter.serviceMonitor.enabled=true \
-    --set nodeExporter.criSocket=/run/k3s/containerd/containerd.sock \
+    --set serviceMonitor.enabled=true \
+    --set grafana.dashboards.enabled=true
+
+echo "==> Installing node-exporter chart"
+helm install "${NODE_RELEASE}" "${NODE_CHART_DIR}" \
+    --namespace "${HELM_TEST_NAMESPACE}" --create-namespace \
+    --set image.repository="${HELM_TEST_IMAGE_NAME}" \
+    --set image.tag="${HELM_TEST_IMAGE_TAG}" \
+    --set image.pullPolicy=Never \
+    --set serviceMonitor.enabled=true \
+    --set criSocket=/run/k3s/containerd/containerd.sock \
     --set grafana.dashboards.enabled=true
 
 echo "==> Waiting for cluster-exporter Deployment to be ready"
-kubectl rollout status deployment \
+kubectl rollout status deployment/"${CLUSTER_RELEASE}" \
     -n "${HELM_TEST_NAMESPACE}" --timeout=2m
 
 echo "==> Waiting for node-exporter DaemonSet to be ready"
-kubectl rollout status daemonset \
+kubectl rollout status daemonset/"${NODE_RELEASE}" \
     -n "${HELM_TEST_NAMESPACE}" --timeout=2m
 
-echo "==> Running helm test (in-cluster health check)"
-helm test container-image-exporter -n "${HELM_TEST_NAMESPACE}"
+echo "==> Running helm test on cluster-exporter release"
+helm test "${CLUSTER_RELEASE}" -n "${HELM_TEST_NAMESPACE}"
+
+echo "==> Running helm test on node-exporter release"
+helm test "${NODE_RELEASE}" -n "${HELM_TEST_NAMESPACE}"
 
 # ---------------------------------------------------------------------------
 # Verify metrics
@@ -193,9 +208,9 @@ wait_for_query() {
 # k8s Service name); the `job` label's format depends on the prometheus-operator
 # version and is less stable.
 wait_for_query "Prometheus has scraped at least one cluster-exporter target" \
-    'up{service="container-image-exporter-cluster-exporter"} == 1' 90
+    "up{service=\"${CLUSTER_RELEASE}\"} == 1" 90
 wait_for_query "Prometheus has scraped at least one node-exporter target" \
-    'up{service="container-image-exporter-node-exporter"} == 1' 90
+    "up{service=\"${NODE_RELEASE}\"} == 1" 90
 
 wait_for_query "cluster-exporter up" 'container_image_cluster_exporter_up'
 wait_for_query "node-exporter up" 'container_image_node_exporter_up'

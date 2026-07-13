@@ -1,0 +1,39 @@
+suite: service
+templates:
+  - templates/service.yaml
+release:
+  name: cie
+  namespace: ci-test
+set:
+  image.repository: foo
+tests:
+  - it: service is headless
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: None
+
+  - it: scrapeAnnotations=true renders prometheus.io annotations (default)
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "8080"
+      - equal:
+          path: metadata.annotations["prometheus.io/path"]
+          value: /metrics
+
+  - it: scrapeAnnotations=false removes prometheus.io annotations
+    set:
+      service.scrapeAnnotations: false
+    asserts:
+      - notExists:
+          path: metadata.annotations["prometheus.io/scrape"]
+
+  - it: carries component=node-exporter label
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: node-exporter

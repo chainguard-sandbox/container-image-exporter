@@ -1,0 +1,38 @@
+suite: servicemonitor
+templates:
+  - templates/servicemonitor.yaml
+release:
+  name: cie
+set:
+  image.repository: foo
+tests:
+  - it: not rendered by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when enabled
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: cluster-exporter
+
+  - it: additionalLabels.release renders on the ServiceMonitor metadata
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.additionalLabels:
+        release: prometheus
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: prometheus
+      # Base labels must still be present.
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: cluster-exporter

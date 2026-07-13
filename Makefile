@@ -74,15 +74,23 @@ test-node: $(K3D)
 		/node-integration.test -test.v -pods=$(PODS) \
 		-cri.socket=/run/k3s/containerd/containerd.sock
 
+CLUSTER_CHART_DIR ?= ./deploy/charts/cluster-exporter
+NODE_CHART_DIR    ?= ./deploy/charts/node-exporter
+
 .PHONY: test-helm test-helm-lint test-helm-unit test-helm-integration
 
 test-helm: test-helm-lint test-helm-unit test-helm-integration
 
 test-helm-lint:
+	CLUSTER_CHART_DIR=$(CLUSTER_CHART_DIR) \
+	NODE_CHART_DIR=$(NODE_CHART_DIR) \
 	./scripts/test-helm-lint.sh
 
 test-helm-unit: $(UNITTEST)
-	UNITTEST=$(UNITTEST) ./scripts/test-helm-unit.sh
+	UNITTEST=$(UNITTEST) \
+	CLUSTER_CHART_DIR=$(CLUSTER_CHART_DIR) \
+	NODE_CHART_DIR=$(NODE_CHART_DIR) \
+	./scripts/test-helm-unit.sh
 
 test-helm-integration: $(K3D)
 	K3D=$(K3D) \
@@ -91,6 +99,8 @@ test-helm-integration: $(K3D)
 	HELM_TEST_IMAGE_TAG=$(HELM_TEST_IMAGE_TAG) \
 	HELM_TEST_NAMESPACE=$(HELM_TEST_NAMESPACE) \
 	HELM_MONITORING_NS=$(HELM_MONITORING_NS) \
+	CLUSTER_CHART_DIR=$(CLUSTER_CHART_DIR) \
+	NODE_CHART_DIR=$(NODE_CHART_DIR) \
 	./scripts/test-helm-integration.sh
 
 .PHONY: demo

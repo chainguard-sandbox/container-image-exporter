@@ -1,0 +1,7 @@
+image:
+  repository: foo
+rbac:
+  extraRule:
+    - apiGroups: ["tekton.dev"]
+      resources: ["tasks"]
+      verbs: ["get"]

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "container-image-exporter-cluster.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter-cluster.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "container-image-exporter-cluster.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "container-image-exporter-cluster.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "container-image-exporter-cluster.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: cluster-exporter
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - cluster-exporter
+            - --metrics-bind-address=:{{ .Values.metricsPort }}
+            - --health-probe-bind-address=:{{ .Values.healthPort }}
+            - --k8s-keychain={{ .Values.k8sKeychain }}
+            - --platform={{ .Values.platform }}
+            - --cache-duration={{ .Values.cacheDuration }}
+            - --registry-concurrency={{ .Values.registryConcurrency }}
+            - --registry-rps={{ .Values.registryRps }}
+            - --registry-timeout={{ .Values.registryTimeout }}
+            # Always set so --image-pull-secret can look up Secrets in the
+            # release namespace. Harmless when --image-pull-secret is unset.
+            - --install-namespace={{ .Release.Namespace }}
+            {{- range .Values.namespaces }}
+            - --namespaces={{ . }}
+            {{- end }}
+            {{- range .Values.annotationAllowlist }}
+            - --annotation-allowlist={{ . }}
+            {{- end }}
+            {{- range .Values.labelAllowlist }}
+            - --label-allowlist={{ . }}
+            {{- end }}
+            {{- range .Values.registryPullSecrets }}
+            - --image-pull-secret={{ . }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metricsPort }}
+              protocol: TCP
+            - name: health
+              containerPort: {{ .Values.healthPort }}
+              protocol: TCP
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            # The ambient AWS ECR credential helper caches short-lived tokens
+            # under $HOME/.ecr, which clashes with readOnlyRootFilesystem if we
+            # don't mount it as a writable volume.
+            - name: ecr-cache
+              mountPath: /home/nonroot/.ecr
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: ecr-cache
+          emptyDir: {}
+        {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

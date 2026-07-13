@@ -1,0 +1,13 @@
+{{- if .Values.grafana.dashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "container-image-exporter-node.fullname" . }}-dashboard-node-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "container-image-exporter-node.labels" . | nindent 4 }}
+    {{- toYaml .Values.grafana.dashboards.labels | nindent 4 }}
+data:
+  node-exporter-chainguard-adoption.json: |-
+    {{- .Files.Get "dashboards/node-exporter-chainguard-adoption.json" | nindent 4 }}
+{{- end }}
