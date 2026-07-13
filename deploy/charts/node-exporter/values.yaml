@@ -108,3 +108,9 @@ grafana:
     # Must match sidecar.dashboards.label in your kube-prometheus-stack values.
     labels:
       grafana_dashboard: "1"
+
+tests:
+  curl:
+    image:
+      repository: cgr.dev/chainguard/curl
+      tag: latest

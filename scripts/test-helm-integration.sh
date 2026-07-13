@@ -9,6 +9,8 @@ HELM_TEST_NAMESPACE="${HELM_TEST_NAMESPACE:-container-image-exporter}"
 HELM_MONITORING_NS="${HELM_MONITORING_NS:-monitoring}"
 CLUSTER_RELEASE="${CLUSTER_RELEASE:-container-image-exporter-cluster}"
 NODE_RELEASE="${NODE_RELEASE:-container-image-exporter-node}"
+CLUSTER_CHART_DIR="${CLUSTER_CHART_DIR:-./deploy/charts/cluster-exporter}"
+NODE_CHART_DIR="${NODE_CHART_DIR:-./deploy/charts/node-exporter}"
 
 # diagnose dumps cluster state and component logs on failure. Best-effort.
 diagnose() {
@@ -123,7 +125,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 # ---------------------------------------------------------------------------
 
 echo "==> Installing cluster-exporter chart"
-helm install "${CLUSTER_RELEASE}" ./deploy/charts/cluster-exporter \
+helm install "${CLUSTER_RELEASE}" "${CLUSTER_CHART_DIR}" \
     --namespace "${HELM_TEST_NAMESPACE}" --create-namespace \
     --set image.repository="${HELM_TEST_IMAGE_NAME}" \
     --set image.tag="${HELM_TEST_IMAGE_TAG}" \
@@ -132,7 +134,7 @@ helm install "${CLUSTER_RELEASE}" ./deploy/charts/cluster-exporter \
     --set grafana.dashboards.enabled=true
 
 echo "==> Installing node-exporter chart"
-helm install "${NODE_RELEASE}" ./deploy/charts/node-exporter \
+helm install "${NODE_RELEASE}" "${NODE_CHART_DIR}" \
     --namespace "${HELM_TEST_NAMESPACE}" --create-namespace \
     --set image.repository="${HELM_TEST_IMAGE_NAME}" \
     --set image.tag="${HELM_TEST_IMAGE_TAG}" \
@@ -149,8 +151,11 @@ echo "==> Waiting for node-exporter DaemonSet to be ready"
 kubectl rollout status daemonset/"${NODE_RELEASE}" \
     -n "${HELM_TEST_NAMESPACE}" --timeout=2m
 
-echo "==> Running helm test (in-cluster health check)"
+echo "==> Running helm test on cluster-exporter release"
 helm test "${CLUSTER_RELEASE}" -n "${HELM_TEST_NAMESPACE}"
+
+echo "==> Running helm test on node-exporter release"
+helm test "${NODE_RELEASE}" -n "${HELM_TEST_NAMESPACE}"
 
 # ---------------------------------------------------------------------------
 # Verify metrics
