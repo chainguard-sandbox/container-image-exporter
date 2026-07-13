@@ -50,6 +50,22 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Labels for helm test Pods. Uses "component: test" instead of the Deployment's
+component label so the ReplicaSet controller does not treat the test Pod as
+one of its own replicas and try to reconcile the pod count.
+*/}}
+{{- define "container-image-exporter-cluster.testLabels" -}}
+helm.sh/chart: {{ include "container-image-exporter-cluster.chart" . }}
+app.kubernetes.io/name: {{ include "container-image-exporter-cluster.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: test
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "container-image-exporter-cluster.serviceAccountName" -}}

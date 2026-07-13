@@ -4,7 +4,7 @@ metadata:
   name: "{{ include "container-image-exporter-cluster.fullname" . }}-test-connection"
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "container-image-exporter-cluster.labels" . | nindent 4 }}
+    {{- include "container-image-exporter-cluster.testLabels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded

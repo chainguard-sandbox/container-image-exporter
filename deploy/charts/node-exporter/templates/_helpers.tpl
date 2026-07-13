@@ -50,6 +50,22 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Labels for helm test Pods. Uses "component: test" instead of the DaemonSet's
+component label so the DaemonSet controller does not identify the test Pod
+as an extra Pod matching its selector and delete it before curl runs.
+*/}}
+{{- define "container-image-exporter-node.testLabels" -}}
+helm.sh/chart: {{ include "container-image-exporter-node.chart" . }}
+app.kubernetes.io/name: {{ include "container-image-exporter-node.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: test
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "container-image-exporter-node.serviceAccountName" -}}
