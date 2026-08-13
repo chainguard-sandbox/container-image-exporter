@@ -6,7 +6,7 @@ require (
 	github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.12.0
 	github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589
 	github.com/containerd/containerd/v2 v2.3.3
-	github.com/google/go-containerregistry v0.21.8
+	github.com/google/go-containerregistry v0.21.9
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20260411021910-5b80281da727
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.2
